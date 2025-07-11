@@ -2,6 +2,13 @@
   "version": 2,
   "name": "smartimport-5-0",
   "rewrites": [
+    { "source": "/manifest.json", "destination": "/manifest.json" },
+    { "source": "/favicon.svg", "destination": "/favicon.svg" },
+    { "source": "/icon-192x192.png", "destination": "/icon-192x192.png" },
+    { "source": "/icon-512x512.png", "destination": "/icon-512x512.png" },
+    { "source": "/apple-touch-icon.png", "destination": "/apple-touch-icon.png" },
+    { "source": "/robots.txt", "destination": "/robots.txt" },
+    { "source": "/static/(.*)", "destination": "/static/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

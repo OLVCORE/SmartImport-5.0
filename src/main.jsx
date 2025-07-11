@@ -10,6 +10,9 @@ import App from './App.jsx'
 import ErrorFallback from './components/ErrorFallback.jsx'
 import './styles/index.css'
 
+// Force cache busting for Vercel
+console.log('SmartImport 5.0 - Build:', Date.now());
+
 // Create a client
 const queryClient = new QueryClient({
   defaultOptions: {

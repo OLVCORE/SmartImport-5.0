@@ -1,6 +1,10 @@
 {
   "version": 2,
   "name": "smartimport-5-0",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": "vite",
   "env": {
     "VITE_APP_NAME": "SmartImport 5.0",
     "VITE_APP_VERSION": "5.0.0"

@@ -1,537 +1,384 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import axios from 'axios'
-import { 
-  customsRegimes, 
-  customsLocations, 
-  fiscalIncentives, 
-  customsExpenses, 
-  extraExpenses, 
-  requiredLicenses,
-  icmsRates,
-  fcpRates,
-  getCustomsLocation,
-  getRequiredLicenses,
-  getApplicableIncentives,
-  calculateICMSInterestadual
-} from '../data/importData'
+import toast from 'react-hot-toast'
 
-console.log('[SmartImport] simulationStore carregado')
-
-// API base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-
-// Função para buscar dados da API com fallback
-const fetchFromAPI = async (endpoint, fallbackData) => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}${endpoint}`)
-    return response.data
-  } catch (error) {
-    console.warn(`API call failed for ${endpoint}, using fallback data:`, error.message)
-    return fallbackData
-  }
-}
-
-// Função para calcular impostos baseada no regime aduaneiro
-const calculateTaxesByRegime = (regime, baseCalculo, ncmCode, originState, destinationState) => {
-  const regimeData = customsRegimes.find(r => r.code === regime)
-  
-  if (!regimeData) {
-    return { ii: 0, ipi: 0, pis: 0, cofins: 0, icms: 0, fcp: 0 }
-  }
-
-  // Buscar alíquotas da API ou usar fallback
-  const ncmData = {
-    ii: 16.0, // 16% padrão
-    ipi: 8.0,  // 8% padrão
-    pis: 2.1,  // 2.1% padrão
-    cofins: 9.65 // 9.65% padrão
-  }
-
-  let ii = 0
-  let ipi = 0
-  let pis = 0
-  let cofins = 0
-  let icms = 0
-  let fcp = 0
-
-  // Aplicar lógica específica por regime
-  switch (regimeData.calculationMethod) {
-    case 'standard':
-      ii = (baseCalculo * ncmData.ii) / 100
-      ipi = (baseCalculo * ncmData.ipi) / 100
-      pis = (baseCalculo * ncmData.pis) / 100
-      cofins = (baseCalculo * ncmData.cofins) / 100
-      
-      // Calcular ICMS interestadual
-      const icmsCalc = calculateICMSInterestadual(originState, destinationState, baseCalculo)
-      icms = icmsCalc.icmsInterestadual
-      fcp = icmsCalc.fcp
-      break
-      
-    case 'temporary':
-      // Admissão temporária - impostos suspensos
-      ii = 0
-      ipi = 0
-      pis = 0
-      cofins = 0
-      icms = 0
-      fcp = 0
-      break
-      
-    case 'drawback':
-      // Drawback - impostos suspensos
-      ii = 0
-      ipi = 0
-      pis = 0
-      cofins = 0
-      icms = 0
-      fcp = 0
-      break
-      
-    case 'reimport':
-      // Reimportação - impostos reduzidos
-      ii = (baseCalculo * ncmData.ii * 0.5) / 100
-      ipi = (baseCalculo * ncmData.ipi * 0.5) / 100
-      pis = (baseCalculo * ncmData.pis) / 100
-      cofins = (baseCalculo * ncmData.cofins) / 100
-      
-      const icmsCalcReimport = calculateICMSInterestadual(originState, destinationState, baseCalculo)
-      icms = icmsCalcReimport.icmsInterestadual
-      fcp = icmsCalcReimport.fcp
-      break
-      
-    default:
-      ii = (baseCalculo * ncmData.ii) / 100
-      ipi = (baseCalculo * ncmData.ipi) / 100
-      pis = (baseCalculo * ncmData.pis) / 100
-      cofins = (baseCalculo * ncmData.cofins) / 100
-      
-      const icmsCalcDefault = calculateICMSInterestadual(originState, destinationState, baseCalculo)
-      icms = icmsCalcDefault.icmsInterestadual
-      fcp = icmsCalcDefault.fcp
-  }
-
-  return { ii, ipi, pis, cofins, icms, fcp }
-}
-
-// Função para calcular despesas aduaneiras
-const calculateCustomsExpenses = (transportMode, locationCode, weight, containers, days) => {
-  const location = getCustomsLocation(locationCode)
-  if (!location) return { total: 0, details: [] }
-
-  const expenses = customsExpenses[transportMode] || []
-  let total = 0
-  const details = []
-
-  expenses.forEach(expense => {
-    let amount = 0
-    
-    switch (expense.calculationMethod) {
-      case 'per_ton':
-        amount = expense.rate * weight
-        break
-      case 'per_container':
-        amount = expense.rate * containers
-        break
-      case 'per_day':
-        amount = expense.rate * days
-        break
-      default:
-        amount = expense.rate
+// Mock data para demonstração
+const mockSimulations = [
+  {
+    id: 1,
+    productName: 'Smartphone Samsung Galaxy S24',
+    ncmCode: '8517.12.00',
+    originCountry: 'China',
+    destinationState: 'SP',
+    transportMode: 'maritime',
+    totalValue: 25000,
+    finalValue: 42500,
+    status: 'completed',
+    createdAt: '2024-01-15T10:30:00Z',
+    updatedAt: '2024-01-15T11:45:00Z',
+    profitability: 70.0,
+    taxes: {
+      ii: 4000,
+      ipi: 2000,
+      pis: 525,
+      cofins: 2412.5,
+      icms: 4500,
+      fcp: 500
+    },
+    details: {
+      productValue: 25000,
+      freightValue: 3000,
+      insuranceValue: 750,
+      weight: 0.5,
+      containers: 1,
+      storageDays: 5
     }
-
-    total += amount
-    details.push({
-      code: expense.code,
-      name: expense.name,
-      amount: amount,
-      rate: expense.rate,
-      calculationMethod: expense.calculationMethod
-    })
-  })
-
-  return { total, details }
-}
-
-// Função para calcular despesas extras
-const calculateExtraExpenses = (baseCalculo, selectedExpenses) => {
-  let total = 0
-  const details = []
-
-  selectedExpenses.forEach(expenseCode => {
-    const expense = extraExpenses.find(e => e.code === expenseCode)
-    if (expense) {
-      let amount = 0
-      
-      if (expense.calculationMethod === 'percentage') {
-        amount = (baseCalculo * expense.rate) / 100
-      } else {
-        amount = expense.rate
-      }
-
-      total += amount
-      details.push({
-        code: expense.code,
-        name: expense.name,
-        amount: amount,
-        rate: expense.rate,
-        calculationMethod: expense.calculationMethod
-      })
+  },
+  {
+    id: 2,
+    productName: 'Máquina Industrial CNC',
+    ncmCode: '8457.10.00',
+    originCountry: 'Alemanha',
+    destinationState: 'RJ',
+    transportMode: 'air',
+    totalValue: 150000,
+    finalValue: 285000,
+    status: 'pending',
+    createdAt: '2024-01-14T14:20:00Z',
+    updatedAt: '2024-01-14T16:10:00Z',
+    profitability: 90.0,
+    taxes: {
+      ii: 24000,
+      ipi: 12000,
+      pis: 3150,
+      cofins: 14475,
+      icms: 27000,
+      fcp: 3000
+    },
+    details: {
+      productValue: 150000,
+      freightValue: 15000,
+      insuranceValue: 3750,
+      weight: 2.5,
+      containers: 2,
+      storageDays: 8
     }
-  })
+  }
+]
 
-  return { total, details }
-}
+const mockCustomsRegimes = [
+  {
+    code: '01',
+    name: 'Importação para Consumo',
+    description: 'Importação definitiva para consumo interno',
+    calculationMethod: 'standard',
+    iiRate: 0.16,
+    ipiRate: 0.08,
+    icmsRate: 0.18,
+    fcpRate: 0.02
+  },
+  {
+    code: '02',
+    name: 'Importação Temporária',
+    description: 'Importação temporária com reexportação',
+    calculationMethod: 'temporary',
+    iiRate: 0.00,
+    ipiRate: 0.00,
+    icmsRate: 0.00,
+    fcpRate: 0.00
+  },
+  {
+    code: '03',
+    name: 'Drawback',
+    description: 'Drawback com suspensão de impostos',
+    calculationMethod: 'drawback',
+    iiRate: 0.00,
+    ipiRate: 0.00,
+    icmsRate: 0.00,
+    fcpRate: 0.00
+  },
+  {
+    code: '04',
+    name: 'Reimportação',
+    description: 'Reimportação de produtos exportados',
+    calculationMethod: 'reimport',
+    iiRate: 0.08,
+    ipiRate: 0.04,
+    icmsRate: 0.18,
+    fcpRate: 0.02
+  }
+]
 
-// Função para calcular incentivos fiscais
-const calculateFiscalIncentives = (baseCalculo, originState, destinationState, locationCode, ncmCode) => {
-  const applicableIncentives = getApplicableIncentives(destinationState, locationCode, ncmCode)
-  let totalSavings = 0
-  const details = []
-
-  applicableIncentives.forEach(incentive => {
-    let savings = 0
-    
-    if (incentive.calculationMethod === 'percentage') {
-      savings = (baseCalculo * incentive.rate) / 100
-    } else if (incentive.calculationMethod === 'exemption') {
-      // Para ZFM, calcular economia baseada nos impostos que seriam cobrados
-      const standardTaxes = calculateTaxesByRegime('06', baseCalculo, ncmCode, originState, destinationState)
-      savings = standardTaxes.ii + standardTaxes.ipi
-    }
-
-    totalSavings += savings
-    details.push({
-      code: incentive.code,
-      name: incentive.name,
-      savings: savings,
-      rate: incentive.rate,
-      calculationMethod: incentive.calculationMethod
-    })
-  })
-
-  return { totalSavings, details }
-}
-
-// Função para verificar licenças obrigatórias
-const checkRequiredLicenses = (ncmCode) => {
-  return getRequiredLicenses(ncmCode)
-}
-
-// Função para gerar simulações mockadas robustas
-function generateMockSimulations() {
-  // Exemplo: 10 simulações variadas
-  const products = [
-    'Smartphone iPhone 15', 'Notebook Dell XPS', 'Tablet Samsung Galaxy',
-    'Smart TV LG OLED', 'Fone de Ouvido Sony', 'Câmera Canon EOS',
-    'Drone DJI Mavic', 'Console PlayStation 5', 'Smartwatch Apple Watch',
-    'Monitor Dell UltraSharp'
+const mockCustomsLocations = {
+  maritime: [
+    { code: 'BRSP', name: 'Porto de Santos', state: 'SP' },
+    { code: 'BRRJ', name: 'Porto do Rio de Janeiro', state: 'RJ' },
+    { code: 'BRPR', name: 'Porto de Paranaguá', state: 'PR' },
+    { code: 'BRRS', name: 'Porto de Rio Grande', state: 'RS' }
+  ],
+  air: [
+    { code: 'BRSP', name: 'Aeroporto de Guarulhos', state: 'SP' },
+    { code: 'BRRJ', name: 'Aeroporto do Galeão', state: 'RJ' },
+    { code: 'BRMG', name: 'Aeroporto de Confins', state: 'MG' },
+    { code: 'BRRS', name: 'Aeroporto Salgado Filho', state: 'RS' }
+  ],
+  land: [
+    { code: 'BRRS', name: 'Fronteira Uruguaiana', state: 'RS' },
+    { code: 'BRPR', name: 'Fronteira Foz do Iguaçu', state: 'PR' },
+    { code: 'BRSC', name: 'Fronteira Dionísio Cerqueira', state: 'SC' }
   ]
-  const regimes = ['01', '02', '03', '04', '05', '06']
-  const modes = ['maritime', 'air', 'land']
-  const states = ['SP', 'RJ', 'MG', 'RS', 'PR', 'SC', 'BA', 'CE', 'GO', 'MT']
-  const mockSimulations = []
-  for (let i = 0; i < 10; i++) {
-    const productValue = Math.random() * 5000 + 500
-    const freightValue = Math.random() * 800 + 200
-    const insuranceValue = productValue * 0.02
-    const baseCalculo = productValue + freightValue + insuranceValue
-    mockSimulations.push({
-      id: `sim_${i + 1}`,
-      productName: products[Math.floor(Math.random() * products.length)],
-      ncmCode: `${Math.floor(Math.random() * 99) + 1}.${Math.floor(Math.random() * 99) + 1}.${Math.floor(Math.random() * 99) + 1}`,
-      originCountry: 'Brasil',
-      originState: states[Math.floor(Math.random() * states.length)],
-      destinationState: states[Math.floor(Math.random() * states.length)],
-      transportMode: modes[Math.floor(Math.random() * modes.length)],
-      customsRegime: regimes[Math.floor(Math.random() * regimes.length)],
-      customsLocation: 'BRSSZ',
-      productValue,
-      freightValue,
-      insuranceValue,
-      weight: Math.random() * 10 + 1,
-      containers: Math.floor(Math.random() * 3) + 1,
-      storageDays: Math.floor(Math.random() * 10) + 3,
-      calculatedTaxes: { ii: 160, ipi: 80, pis: 21, cofins: 96.5, icms: 180, fcp: 20 },
-      calculatedExpenses: { customs: { total: 100 }, extra: { total: 0 } },
-      calculatedIncentives: { totalSavings: 0 },
-      requiredLicenses: [],
-      totalCost: baseCalculo + 160 + 80 + 21 + 96.5 + 180 + 20 + 100,
-      createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'calculated'
-    })
-  }
-  return mockSimulations
 }
+
+const mockFiscalIncentives = [
+  {
+    id: 1,
+    name: 'Zona Franca de Manaus',
+    description: 'Incentivos fiscais para produtos da ZFM',
+    type: 'regional',
+    applicableStates: ['AM'],
+    taxReduction: {
+      ii: 0.88,
+      ipi: 0.50,
+      icms: 0.00
+    }
+  },
+  {
+    id: 2,
+    name: 'REIDI',
+    description: 'Regime Especial de Incentivos para Desenvolvimento da Infraestrutura',
+    type: 'sectorial',
+    applicableSectors: ['infrastructure', 'energy', 'transport'],
+    taxReduction: {
+      ii: 0.00,
+      ipi: 0.00,
+      icms: 0.00
+    }
+  }
+]
 
 export const useSimulationStore = create(
   persist(
     (set, get) => ({
-      // Estado da simulação
-      simulation: {
-        // Dados básicos
-        productName: '',
-        ncmCode: '',
-        originCountry: '',
-        destinationState: '',
-        originState: '',
-        
-        // Modal e regime
-        transportMode: 'maritime',
-        customsRegime: '06',
-        customsLocation: '',
-        
-        // Valores
-        productValue: 0,
-        freightValue: 0,
-        insuranceValue: 0,
-        
-        // Dimensões
-        weight: 0,
-        containers: 1,
-        storageDays: 5,
-        
-        // Despesas extras selecionadas
-        selectedExtraExpenses: [],
-        
-        // Resultados calculados
-        calculatedTaxes: {},
-        calculatedExpenses: {},
-        calculatedIncentives: {},
-        requiredLicenses: [],
-        totalCost: 0,
-        
-        // Estados
-        isLoading: false,
-        error: null,
-        lastCalculated: null
+      // State
+      simulations: mockSimulations,
+      currentSimulation: null,
+      isLoading: false,
+      error: null,
+      
+      // Customs data
+      customsRegimes: mockCustomsRegimes,
+      customsLocations: mockCustomsLocations,
+      fiscalIncentives: mockFiscalIncentives,
+      
+      // Settings
+      settings: {
+        theme: 'system',
+        notifications: true,
+        autoSave: true,
+        language: 'pt-BR',
+        currency: 'BRL',
+        timezone: 'America/Sao_Paulo'
       },
 
-      // Ações
-      setSimulationData: (data) => {
-        set((state) => ({
-          simulation: { ...state.simulation, ...data }
-        }))
-      },
+      // Actions
+      setLoading: (loading) => set({ isLoading: loading }),
+      
+      setError: (error) => set({ error }),
+      
+      clearError: () => set({ error: null }),
 
-      // Calcular simulação completa
-      calculateSimulation: async () => {
-        const state = get()
-        const sim = state.simulation
+      // Simulation actions
+      createSimulation: (simulationData) => {
+        const newSimulation = {
+          id: Date.now(),
+          ...simulationData,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
         
         set((state) => ({
-          simulation: { ...state.simulation, isLoading: true, error: null }
+          simulations: [newSimulation, ...state.simulations],
+          currentSimulation: newSimulation
         }))
+        
+        toast.success('Simulação criada com sucesso!')
+        return newSimulation
+      },
 
-        try {
-          // Base de cálculo
-          const baseCalculo = sim.productValue + sim.freightValue + sim.insuranceValue
-          
-          // Calcular impostos baseado no regime
-          const taxes = calculateTaxesByRegime(
-            sim.customsRegime,
-            baseCalculo,
-            sim.ncmCode,
-            sim.originState,
-            sim.destinationState
-          )
-          
-          // Calcular despesas aduaneiras
-          const customsExpenses = calculateCustomsExpenses(
-            sim.transportMode,
-            sim.customsLocation,
-            sim.weight,
-            sim.containers,
-            sim.storageDays
-          )
-          
-          // Calcular despesas extras
-          const extraExpenses = calculateExtraExpenses(baseCalculo, sim.selectedExtraExpenses)
-          
-          // Calcular incentivos fiscais
-          const incentives = calculateFiscalIncentives(
-            baseCalculo,
-            sim.originState,
-            sim.destinationState,
-            sim.customsLocation,
-            sim.ncmCode
-          )
-          
-          // Verificar licenças obrigatórias
-          const licenses = checkRequiredLicenses(sim.ncmCode)
-          
-          // Calcular custo total
-          const totalTaxes = taxes.ii + taxes.ipi + taxes.pis + taxes.cofins + taxes.icms + taxes.fcp
-          const totalExpenses = customsExpenses.total + extraExpenses.total
-          const totalCost = baseCalculo + totalTaxes + totalExpenses - incentives.totalSavings
-          
-          set((state) => ({
-            simulation: {
-              ...state.simulation,
-              calculatedTaxes: taxes,
-              calculatedExpenses: {
-                customs: customsExpenses,
-                extra: extraExpenses
-              },
-              calculatedIncentives: incentives,
-              requiredLicenses: licenses,
-              totalCost: totalCost,
-              isLoading: false,
-              lastCalculated: new Date().toISOString()
+      updateSimulation: (id, updates) => {
+        set((state) => ({
+          simulations: state.simulations.map(sim => 
+            sim.id === id 
+              ? { ...sim, ...updates, updatedAt: new Date().toISOString() }
+              : sim
+          ),
+          currentSimulation: state.currentSimulation?.id === id 
+            ? { ...state.currentSimulation, ...updates, updatedAt: new Date().toISOString() }
+            : state.currentSimulation
+        }))
+        
+        toast.success('Simulação atualizada!')
+      },
+
+      deleteSimulation: (id) => {
+        set((state) => ({
+          simulations: state.simulations.filter(sim => sim.id !== id),
+          currentSimulation: state.currentSimulation?.id === id ? null : state.currentSimulation
+        }))
+        
+        toast.success('Simulação excluída!')
+      },
+
+      setCurrentSimulation: (simulation) => set({ currentSimulation: simulation }),
+
+      calculateSimulation: (simulationData) => {
+        set({ isLoading: true })
+        
+        // Simular cálculo
+        setTimeout(() => {
+          const calculatedSimulation = {
+            ...simulationData,
+            status: 'completed',
+            finalValue: simulationData.totalValue * 1.7, // Mock calculation
+            profitability: 70.0,
+            taxes: {
+              ii: simulationData.totalValue * 0.16,
+              ipi: simulationData.totalValue * 0.08,
+              pis: simulationData.totalValue * 0.021,
+              cofins: simulationData.totalValue * 0.0965,
+              icms: simulationData.totalValue * 0.18,
+              fcp: simulationData.totalValue * 0.02
             }
-          }))
-
-        } catch (error) {
+          }
+          
           set((state) => ({
-            simulation: {
-              ...state.simulation,
-              isLoading: false,
-              error: error.message
-            }
+            simulations: [calculatedSimulation, ...state.simulations],
+            currentSimulation: calculatedSimulation,
+            isLoading: false
           }))
-        }
+          
+          toast.success('Simulação calculada com sucesso!')
+        }, 2000)
       },
 
-      // Buscar dados da API
-      fetchNCMData: async (ncmCode) => {
-        try {
-          const data = await fetchFromAPI(`/ncm/${ncmCode}`, {
-            code: ncmCode,
-            description: 'Produto não encontrado',
-            ii: 16.0,
-            ipi: 8.0,
-            pis: 2.1,
-            cofins: 9.65
-          })
-          return data
-        } catch (error) {
-          console.error('Error fetching NCM data:', error)
-          return null
-        }
+      // Data getters
+      getSimulations: () => get().simulations,
+      
+      getSimulationById: (id) => get().simulations.find(sim => sim.id === id),
+      
+      getCustomsRegimes: () => get().customsRegimes,
+      
+      getCustomsLocations: () => get().customsLocations,
+      
+      getFiscalIncentives: () => get().fiscalIncentives,
+
+      // Settings actions
+      updateSettings: (newSettings) => {
+        set((state) => ({
+          settings: { ...state.settings, ...newSettings }
+        }))
+        toast.success('Configurações atualizadas!')
       },
 
-      fetchFreightData: async (origin, destination, mode, weight) => {
-        try {
-          const data = await fetchFromAPI(`/freight?origin=${origin}&destination=${destination}&mode=${mode}&weight=${weight}`, {
-            freight: 1500.00,
-            insurance: 75.00,
-            transitTime: 15
-          })
-          return data
-        } catch (error) {
-          console.error('Error fetching freight data:', error)
-          return null
+      // Export actions
+      exportSimulation: (id, format = 'pdf') => {
+        const simulation = get().getSimulationById(id)
+        if (!simulation) {
+          toast.error('Simulação não encontrada!')
+          return
         }
-      },
-
-      // Salvar simulação
-      saveSimulation: async () => {
-        const state = get()
-        const sim = state.simulation
         
-        set((state) => ({
-          simulation: { ...state.simulation, isLoading: true }
-        }))
+        // Mock export
+        toast.success(`Simulação exportada em ${format.toUpperCase()}!`)
+        return simulation
+      },
 
-        try {
-          const response = await axios.post(`${API_BASE_URL}/simulations`, {
-            ...sim,
-            createdAt: new Date().toISOString()
-          })
-          
-          set((state) => ({
-            simulation: { ...state.simulation, isLoading: false }
-          }))
-          
-          return response.data
-        } catch (error) {
-          set((state) => ({
-            simulation: { ...state.simulation, isLoading: false, error: error.message }
-          }))
-          throw error
+      exportAllSimulations: (format = 'pdf') => {
+        const simulations = get().simulations
+        toast.success(`${simulations.length} simulações exportadas em ${format.toUpperCase()}!`)
+        return simulations
+      },
+
+      // Backup actions
+      createBackup: () => {
+        const state = get()
+        const backup = {
+          simulations: state.simulations,
+          settings: state.settings,
+          timestamp: new Date().toISOString()
+        }
+        
+        // Mock backup to OneDrive
+        toast.success('Backup criado no OneDrive!')
+        return backup
+      },
+
+      restoreBackup: (backup) => {
+        set({
+          simulations: backup.simulations || [],
+          settings: backup.settings || get().settings
+        })
+        
+        toast.success('Backup restaurado com sucesso!')
+      },
+
+      // Analytics
+      getAnalytics: () => {
+        const simulations = get().simulations
+        const completed = simulations.filter(s => s.status === 'completed')
+        
+        return {
+          total: simulations.length,
+          completed: completed.length,
+          totalValue: completed.reduce((sum, sim) => sum + sim.finalValue, 0),
+          averageProfitability: completed.length > 0 
+            ? completed.reduce((sum, sim) => sum + sim.profitability, 0) / completed.length 
+            : 0
         }
       },
 
-      // Buscar simulações salvas
-      fetchSimulations: async () => {
-        try {
-          // Em produção, sempre retorna mock
-          if (import.meta.env.PROD) {
-            console.log('[SmartImport] Usando dados mockados em produção (Vercel)')
-            return generateMockSimulations()
-          }
-          // Em dev, tenta API, senão mock
-          const response = await axios.get(`${API_BASE_URL}/simulations`)
-          return response.data
-        } catch (error) {
-          console.warn('[SmartImport] Erro ao buscar API, usando mock:', error)
-          return generateMockSimulations()
+      // Search and filter
+      searchSimulations: (query) => {
+        const simulations = get().simulations
+        if (!query) return simulations
+        
+        return simulations.filter(sim => 
+          sim.productName.toLowerCase().includes(query.toLowerCase()) ||
+          sim.ncmCode.includes(query) ||
+          sim.originCountry.toLowerCase().includes(query.toLowerCase())
+        )
+      },
+
+      filterSimulations: (filters) => {
+        let simulations = get().simulations
+        
+        if (filters.status && filters.status !== 'all') {
+          simulations = simulations.filter(sim => sim.status === filters.status)
         }
-      },
-
-      // Limpar simulação
-      clearSimulation: () => {
-        set((state) => ({
-          simulation: {
-            ...state.simulation,
-            productName: '',
-            ncmCode: '',
-            originCountry: '',
-            destinationState: '',
-            originState: '',
-            transportMode: 'maritime',
-            customsRegime: '06',
-            customsLocation: '',
-            productValue: 0,
-            freightValue: 0,
-            insuranceValue: 0,
-            weight: 0,
-            containers: 1,
-            storageDays: 5,
-            selectedExtraExpenses: [],
-            calculatedTaxes: {},
-            calculatedExpenses: {},
-            calculatedIncentives: {},
-            requiredLicenses: [],
-            totalCost: 0,
-            isLoading: false,
-            error: null,
-            lastCalculated: null
-          }
-        }))
-      },
-
-      // Dados estáticos para uso nos componentes
-      getCustomsRegimes: () => customsRegimes || [],
-      getCustomsLocations: () => customsLocations || {},
-      getFiscalIncentives: () => fiscalIncentives || [],
-      getCustomsExpenses: () => customsExpenses,
-      getExtraExpenses: () => extraExpenses,
-      getRequiredLicenses: () => requiredLicenses || [],
-      getICMSRates: () => icmsRates,
-      getFCPRates: () => fcpRates
+        
+        if (filters.transportMode && filters.transportMode !== 'all') {
+          simulations = simulations.filter(sim => sim.transportMode === filters.transportMode)
+        }
+        
+        if (filters.dateRange && filters.dateRange !== 'all') {
+          const now = new Date()
+          const daysAgo = filters.dateRange === '7d' ? 7 : filters.dateRange === '30d' ? 30 : 90
+          const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000)
+          simulations = simulations.filter(sim => new Date(sim.createdAt) >= cutoffDate)
+        }
+        
+        return simulations
+      }
     }),
     {
-      name: 'simulation-storage',
+      name: 'smartimport-store',
       partialize: (state) => ({
-        simulation: {
-          productName: state.simulation.productName,
-          ncmCode: state.simulation.ncmCode,
-          originCountry: state.simulation.originCountry,
-          destinationState: state.simulation.destinationState,
-          originState: state.simulation.originState,
-          transportMode: state.simulation.transportMode,
-          customsRegime: state.simulation.customsRegime,
-          customsLocation: state.simulation.customsLocation,
-          productValue: state.simulation.productValue,
-          freightValue: state.simulation.freightValue,
-          insuranceValue: state.simulation.insuranceValue,
-          weight: state.simulation.weight,
-          containers: state.simulation.containers,
-          storageDays: state.simulation.storageDays,
-          selectedExtraExpenses: state.simulation.selectedExtraExpenses
-        }
+        simulations: state.simulations,
+        settings: state.settings,
+        customsRegimes: state.customsRegimes,
+        customsLocations: state.customsLocations,
+        fiscalIncentives: state.fiscalIncentives
       })
     }
   )

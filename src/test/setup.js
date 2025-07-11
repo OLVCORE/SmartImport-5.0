@@ -1,62 +1,84 @@
+// SmartImport 5.0 - Configuração de Testes
+import { vi } from 'vitest'
 import '@testing-library/jest-dom'
 
 // Mock do localStorage
 const localStorageMock = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
 }
 global.localStorage = localStorageMock
+
+// Mock do sessionStorage
+const sessionStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+}
+global.sessionStorage = sessionStorageMock
+
+// Mock do fetch
+global.fetch = vi.fn()
+
+// Mock do ResizeObserver
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}))
+
+// Mock do IntersectionObserver
+global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}))
 
 // Mock do matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: jest.fn().mockImplementation(query => ({
+  value: vi.fn().mockImplementation(query => ({
     matches: false,
     media: query,
     onchange: null,
-    addListener: jest.fn(), // deprecated
-    removeListener: jest.fn(), // deprecated
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
   })),
 })
 
-// Mock do IntersectionObserver
-global.IntersectionObserver = class IntersectionObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  unobserve() {}
-}
-
-// Mock do ResizeObserver
-global.ResizeObserver = class ResizeObserver {
-  constructor() {}
-  disconnect() {}
-  observe() {}
-  unobserve() {}
-}
-
-// Mock do window.scrollTo
-window.scrollTo = jest.fn()
-
-// Mock do console.error para suprimir warnings de teste
-const originalError = console.error
-beforeAll(() => {
-  console.error = (...args) => {
-    if (
-      typeof args[0] === 'string' &&
-      args[0].includes('Warning: ReactDOM.render is no longer supported')
-    ) {
-      return
-    }
-    originalError.call(console, ...args)
-  }
+// Mock do window.URL.createObjectURL
+Object.defineProperty(window.URL, 'createObjectURL', {
+  writable: true,
+  value: vi.fn(() => 'mock-url'),
 })
 
-afterAll(() => {
-  console.error = originalError
+// Mock do window.URL.revokeObjectURL
+Object.defineProperty(window.URL, 'revokeObjectURL', {
+  writable: true,
+  value: vi.fn(),
+})
+
+// Mock do toast
+global.toast = {
+  success: vi.fn(),
+  error: vi.fn(),
+  warning: vi.fn(),
+  info: vi.fn(),
+}
+
+// Configurações globais de teste
+beforeEach(() => {
+  vi.clearAllMocks()
+  localStorageMock.clear()
+  sessionStorageMock.clear()
+})
+
+afterEach(() => {
+  vi.clearAllTimers()
 }) 

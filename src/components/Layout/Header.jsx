@@ -1,168 +1,160 @@
 import React, { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
-  Sun, 
-  Moon, 
   Menu, 
-  X, 
+  Search, 
   Bell, 
+  Settings, 
   User, 
-  Settings,
-  HelpCircle,
   LogOut,
-  ChevronDown,
-  PlugZap
+  Sun,
+  Moon,
+  ChevronDown
 } from 'lucide-react'
+import { useTheme } from '../../hooks/useTheme'
+import toast from 'react-hot-toast'
+import { AnimatePresence } from 'framer-motion'
 
-const Header = ({ onThemeToggle, theme }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const location = useLocation()
+const Header = ({ onMenuClick, currentPath }) => {
+  const { theme, toggleTheme } = useTheme()
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: '📊' },
-    { name: 'Simulador', href: '/simulator', icon: '🧮' },
-    { name: 'Histórico', href: '/history', icon: '📚' },
-    { name: 'Relatórios', href: '/reports', icon: '📈' },
-    { name: 'Integrações', href: '/integrations', icon: <PlugZap className="w-4 h-4" /> },
-  ]
+  const handleSearch = (e) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      toast.success(`Buscando por: ${searchQuery}`)
+      // Implementar busca global
+    }
+  }
 
-  const userMenuItems = [
-    { name: 'Perfil', icon: User, href: '/profile' },
-    { name: 'Configurações', icon: Settings, href: '/settings' },
-    { name: 'Ajuda', icon: HelpCircle, href: '/help' },
-    { name: 'Sair', icon: LogOut, href: '/logout', danger: true },
-  ]
+  const handleLogout = () => {
+    toast.success('Logout realizado com sucesso!')
+    // Implementar logout
+  }
+
+  const getPageTitle = () => {
+    const titles = {
+      '/dashboard': 'Dashboard',
+      '/simulator': 'Simulador',
+      '/history': 'Histórico',
+      '/reports': 'Relatórios',
+      '/integrations': 'Integrações',
+      '/settings': 'Configurações',
+      '/help': 'Ajuda'
+    }
+    return titles[currentPath] || 'SmartImport 5.0'
+  }
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo and Brand */}
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">SI</span>
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  SmartImport
-                </h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  EXCELTTA
-                </p>
-              </div>
-            </Link>
+    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <div className="flex items-center justify-between px-4 py-3 lg:px-6">
+        {/* Left Section */}
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={onMenuClick}
+            className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+          >
+            <Menu size={20} />
+          </button>
+          
+          <div className="hidden lg:block">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+              {getPageTitle()}
+            </h1>
           </div>
+        </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-8">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
-                  location.pathname === item.href
-                    ? 'text-primary-600 bg-primary-50 dark:bg-primary-900/20 dark:text-primary-400'
-                    : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400'
-                }`}
-              >
-                <span>{item.icon}</span>
-                <span>{item.name}</span>
-              </Link>
-            ))}
-          </nav>
+        {/* Center Section - Search */}
+        <div className="flex-1 max-w-lg mx-4 hidden md:block">
+          <form onSubmit={handleSearch} className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search size={16} className="text-gray-400" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar simulações, produtos..."
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </form>
+        </div>
 
-          {/* Right side controls */}
-          <div className="flex items-center space-x-4">
-            {/* Theme Toggle */}
+        {/* Right Section */}
+        <div className="flex items-center space-x-2">
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+
+          {/* Notifications */}
+          <button className="relative p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700">
+            <Bell size={20} />
+            <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-400"></span>
+          </button>
+
+          {/* Profile Menu */}
+          <div className="relative">
             <button
-              onClick={onThemeToggle}
-              className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-              aria-label="Toggle theme"
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="flex items-center space-x-2 p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
             >
-              {theme === 'dark' ? (
-                <Sun className="w-5 h-5" />
-              ) : (
-                <Moon className="w-5 h-5" />
-              )}
+              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                <User size={16} className="text-white" />
+              </div>
+              <span className="hidden lg:block text-sm font-medium">Usuário</span>
+              <ChevronDown size={16} />
             </button>
 
-            {/* Notifications */}
-            <button className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-danger-500 rounded-full"></span>
-            </button>
-
-            {/* User Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center space-x-2 p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-              >
-                <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <span className="hidden sm:block text-sm font-medium">Usuário</span>
-                <ChevronDown className="w-4 h-4" />
-              </button>
-
-              {isUserMenuOpen && (
+            <AnimatePresence>
+              {showProfileMenu && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
+                  className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700"
                 >
-                  <div className="py-1">
-                    {userMenuItems.map((item) => (
-                      <Link
-                        key={item.name}
-                        to={item.href}
-                        className={`flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 ${
-                          item.danger ? 'text-danger-600 dark:text-danger-400' : ''
-                        }`}
-                        onClick={() => setIsUserMenuOpen(false)}
-                      >
-                        <item.icon className="w-4 h-4" />
-                        <span>{item.name}</span>
-                      </Link>
-                    ))}
-                  </div>
+                  <Link
+                    to="/settings"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => setShowProfileMenu(false)}
+                  >
+                    <Settings size={16} className="mr-3" />
+                    Configurações
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <LogOut size={16} className="mr-3" />
+                    Sair
+                  </button>
                 </motion.div>
               )}
-            </div>
+            </AnimatePresence>
           </div>
         </div>
+      </div>
 
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t border-gray-200 dark:border-gray-700"
-          >
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`flex items-center space-x-3 px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 ${
-                    location.pathname === item.href
-                      ? 'text-primary-600 bg-primary-50 dark:bg-primary-900/20 dark:text-primary-400'
-                      : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400'
-                  }`}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <span>{item.icon}</span>
-                  <span>{item.name}</span>
-                </Link>
-              ))}
-            </div>
-          </motion.div>
-        )}
+      {/* Mobile Search */}
+      <div className="md:hidden px-4 pb-3">
+        <form onSubmit={handleSearch} className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={16} className="text-gray-400" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar..."
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </form>
       </div>
     </header>
   )

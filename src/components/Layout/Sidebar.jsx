@@ -1,104 +1,233 @@
 import React from 'react'
-import { Home, FileText, History, BarChart2, Menu, X, Settings, User, Bell, Shield, Palette, Globe, DollarSign, Sun, Moon, Monitor } from 'lucide-react'
-import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { 
+  LayoutDashboard,
+  Calculator,
+  History,
+  BarChart3,
+  Settings,
+  HelpCircle,
+  Zap,
+  X,
+  TrendingUp,
+  Package,
+  Globe,
+  FileText,
+  Users,
+  Shield,
+  Target
+} from 'lucide-react'
 
-const menuItems = [
-  { label: 'Dashboard', icon: Home, href: '/dashboard' },
-  { label: 'Simulador', icon: BarChart2, href: '/simulator' },
-  { label: 'Histórico', icon: History, href: '/history' },
-  { label: 'Relatórios', icon: FileText, href: '/reports' },
-]
+const Sidebar = ({ onClose }) => {
+  const location = useLocation()
 
-const tools = [
-  { label: 'Classificação NCM', icon: FileText, href: '/ncm' },
-  { label: 'Cálculo Tributário', icon: DollarSign, href: '/tax' },
-  { label: 'Análise Logística', icon: BarChart2, href: '/logistics' },
-  { label: 'Câmbio e Moedas', icon: Globe, href: '/exchange' },
-]
+  const navigation = [
+    {
+      name: 'Dashboard',
+      href: '/dashboard',
+      icon: LayoutDashboard,
+      description: 'Visão geral e métricas'
+    },
+    {
+      name: 'Simulador',
+      href: '/simulator',
+      icon: Calculator,
+      description: 'Simular importações',
+      badge: 'NOVO'
+    },
+    {
+      name: 'Histórico',
+      href: '/history',
+      icon: History,
+      description: 'Simulações anteriores'
+    },
+    {
+      name: 'Relatórios',
+      href: '/reports',
+      icon: BarChart3,
+      description: 'Análises e gráficos'
+    },
+    {
+      name: 'Integrações',
+      href: '/integrations',
+      icon: Zap,
+      description: 'APIs e conectores'
+    },
+    {
+      name: 'Configurações',
+      href: '/settings',
+      icon: Settings,
+      description: 'Preferências do sistema'
+    },
+    {
+      name: 'Ajuda',
+      href: '/help',
+      icon: HelpCircle,
+      description: 'Suporte e documentação'
+    }
+  ]
 
-export default function Sidebar() {
-  const [open, setOpen] = useState(false)
+  const quickActions = [
+    {
+      name: 'Nova Simulação',
+      icon: Calculator,
+      action: () => {
+        // Implementar nova simulação
+        onClose?.()
+      }
+    },
+    {
+      name: 'Importar Dados',
+      icon: Package,
+      action: () => {
+        // Implementar importação
+        onClose?.()
+      }
+    },
+    {
+      name: 'Exportar Relatório',
+      icon: FileText,
+      action: () => {
+        // Implementar exportação
+        onClose?.()
+      }
+    }
+  ]
 
-  // Fecha o drawer ao clicar fora
-  const handleOverlayClick = () => setOpen(false)
+  const isActive = (href) => location.pathname === href
 
   return (
-    <>
-      {/* Botão hamburguer flutuante no canto inferior esquerdo (mobile) */}
-      <button
-        className="fixed bottom-4 left-4 z-50 sm:hidden bg-white/80 dark:bg-gray-900/80 rounded-full p-3 shadow-lg border border-primary-200 dark:border-primary-800 hover:scale-110 transition"
-        onClick={() => setOpen(true)}
-        aria-label="Abrir menu"
-      >
-        <Menu className="w-7 h-7" />
-      </button>
-
-      {/* Botões flutuantes no canto inferior direito (mobile) */}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-3 sm:hidden">
-        <a href="https://wa.me/SEUNUMERO" target="_blank" rel="noopener noreferrer" className="bg-green-500 hover:bg-green-600 text-white rounded-full p-3 shadow-lg flex items-center justify-center transition">
-          <svg viewBox="0 0 32 32" width="24" height="24"><path fill="currentColor" d="M16 3C9.373 3 4 8.373 4 15c0 2.385.832 4.584 2.236 6.393L4 29l7.828-2.236C13.416 27.168 15.615 28 18 28c6.627 0 12-5.373 12-12S22.627 3 16 3zm0 22c-2.021 0-3.938-.627-5.527-1.701l-.393-.262-4.66 1.332 1.332-4.66-.262-.393C5.627 18.938 5 17.021 5 15c0-6.065 4.935-11 11-11s11 4.935 11 11-4.935 11-11 11zm5.293-7.293l-2.586-2.586a1 1 0 00-1.414 0l-1.293 1.293a8.001 8.001 0 01-3.293-3.293l1.293-1.293a1 1 0 000-1.414l-2.586-2.586a1 1 0 00-1.414 0l-1.293 1.293A10.001 10.001 0 0016 25a10.001 10.001 0 0010-10c0-2.021-.627-3.938-1.701-5.527l-1.293 1.293a1 1 0 000 1.414z"/></svg>
-        </a>
-        <button className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-3 shadow-lg flex items-center justify-center transition">
-          <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 3C7.03 3 3 7.03 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-4.97-4.03-9-9-9zm1 14.93c-2.83.48-5.48-1.17-6.36-3.93H5v-2h1.64c.13-.32.29-.62.47-.91l-1.13-1.13 1.41-1.41 1.13 1.13c.29-.18.59-.34.91-.47V5h2v1.64c.32.13.62.29.91.47l1.13-1.13 1.41 1.41-1.13 1.13c.18.29.34.59.47.91H19v2h-1.64c-.13.32-.29.62-.47.91l1.13 1.13-1.41 1.41-1.13-1.13c-.29.18-.59.34-.91.47V19h-2v-1.64z"/></svg>
+    <div className="flex flex-col h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <Link to="/dashboard" className="flex items-center space-x-3" onClick={onClose}>
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center">
+            <Target size={20} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+              SmartImport
+            </h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              EXCELTTA
+            </p>
+          </div>
+        </Link>
+        
+        <button
+          onClick={onClose}
+          className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+        >
+          <X size={20} />
         </button>
       </div>
 
-      {/* Overlay escurecido */}
-      {open && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-40 sm:hidden"
-          onClick={handleOverlayClick}
-        />
-      )}
-
-      {/* Sidebar fixa no desktop, drawer no mobile */}
-      <aside
-        className={`
-          fixed z-50 inset-y-0 left-0 w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800
-          transform transition-transform duration-300
-          ${open ? 'translate-x-0' : '-translate-x-full'} 
-          sm:translate-x-0 sm:static sm:block
-        `}
-        style={{ minHeight: '100vh' }}
-      >
-        {/* Botão fechar no mobile */}
-        <div className="flex items-center justify-between sm:hidden p-4">
-          <span className="font-bold text-lg">Menu</span>
-          <button onClick={() => setOpen(false)} aria-label="Fechar menu">
-            <X className="w-6 h-6" />
-          </button>
+      {/* Navigation */}
+      <nav className="flex-1 px-4 py-6 space-y-2">
+        <div className="mb-6">
+          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+            Navegação
+          </h3>
+          <div className="space-y-1">
+            {navigation.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  onClick={onClose}
+                  className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    isActive(item.href)
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Icon 
+                    size={18} 
+                    className={`mr-3 ${
+                      isActive(item.href) 
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'
+                    }`} 
+                  />
+                  <span className="flex-1">{item.name}</span>
+                  {item.badge && (
+                    <span className="ml-2 px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 rounded-full">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              )
+            })}
+          </div>
         </div>
 
-        <nav className="mt-6 space-y-2 px-4">
-          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">NAVEGAÇÃO</div>
-          {menuItems.map(item => (
-            <a
-              key={item.label}
-              href={item.href}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition"
-              onClick={() => setOpen(false)}
-            >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
-            </a>
-          ))}
-        </nav>
+        {/* Quick Actions */}
+        <div className="mb-6">
+          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+            Ações Rápidas
+          </h3>
+          <div className="space-y-1">
+            {quickActions.map((action) => {
+              const Icon = action.icon
+              return (
+                <button
+                  key={action.name}
+                  onClick={action.action}
+                  className="w-full group flex items-center px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-lg transition-all duration-200"
+                >
+                  <Icon size={18} className="mr-3 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+                  <span>{action.name}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
-        <nav className="mt-8 space-y-2 px-4">
-          <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">FERRAMENTAS</div>
-          {tools.map(item => (
-            <a
-              key={item.label}
-              href={item.href}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition"
-              onClick={() => setOpen(false)}
-            >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
-            </a>
-          ))}
-        </nav>
-      </aside>
-    </>
+        {/* Stats */}
+        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+            Estatísticas
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <TrendingUp size={16} className="text-green-500 mr-2" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">Simulações</span>
+              </div>
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">1,234</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Package size={16} className="text-blue-500 mr-2" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">Produtos</span>
+              </div>
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">567</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Globe size={16} className="text-purple-500 mr-2" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">Países</span>
+              </div>
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">45</span>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+          <span>v5.0.0</span>
+          <div className="flex items-center space-x-1">
+            <Shield size={12} />
+            <span>Seguro</span>
+          </div>
+        </div>
+      </div>
+    </div>
   )
-} 
+}
+
+export default Sidebar 

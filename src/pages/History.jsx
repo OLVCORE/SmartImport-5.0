@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 import { 
-  History,
+  History as HistoryIcon,
   Search,
   Filter,
   Download,
@@ -286,7 +286,7 @@ const History = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <History className="w-12 h-12 text-gray-400 mx-auto mb-4 animate-pulse" />
+          <HistoryIcon className="w-12 h-12 text-gray-400 mx-auto mb-4 animate-pulse" />
           <p className="text-gray-500 dark:text-gray-400">Carregando histórico...</p>
         </div>
       </div>
@@ -498,7 +498,7 @@ const History = () => {
 
           {filteredSimulations.length === 0 && (
             <div className="text-center py-12">
-              <History className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <HistoryIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 Nenhuma simulação encontrada
               </h3>

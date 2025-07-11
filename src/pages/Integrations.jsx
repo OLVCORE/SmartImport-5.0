@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 import { 
   Link,
-  Settings,
+  Settings as SettingsIcon,
   Zap,
   Database,
   Cloud,

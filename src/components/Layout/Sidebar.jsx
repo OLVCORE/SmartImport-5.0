@@ -4,9 +4,9 @@ import { motion } from 'framer-motion'
 import { 
   LayoutDashboard,
   Calculator,
-  History,
+  History as HistoryIcon,
   BarChart3,
-  Settings,
+  Settings as SettingsIcon,
   HelpCircle,
   Zap,
   X,
@@ -39,7 +39,7 @@ const Sidebar = ({ onClose }) => {
     {
       name: 'Histórico',
       href: '/history',
-      icon: History,
+      icon: HistoryIcon,
       description: 'Simulações anteriores'
     },
     {
@@ -57,7 +57,7 @@ const Sidebar = ({ onClose }) => {
     {
       name: 'Configurações',
       href: '/settings',
-      icon: Settings,
+      icon: SettingsIcon,
       description: 'Preferências do sistema'
     },
     {

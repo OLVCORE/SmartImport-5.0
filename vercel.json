@@ -58,11 +58,6 @@
       ]
     }
   ],
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "env": {
     "VITE_APP_NAME": "SmartImport 5.0",
     "VITE_APP_VERSION": "5.0.0"

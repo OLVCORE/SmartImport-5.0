@@ -1,0 +1,373 @@
+/*
+ * Copyright (c) 2024 SmartImport. Todos os direitos reservados.
+ * Este arquivo é propriedade exclusiva da SmartImport e não pode ser copado, modificado,
+ * distribuído ou utilizado sem a permissão expressa e por escrito da SmartImport.
+ *
+ * Arquivo CSS Global - smartimport-app/src/app/globals.css
+ * Versão: 2.0 (Refatorada para Robustez)
+ * Finalidade: Define design tokens, tipografia base, cores temáticas e utilities Tailwind.
+ * Removidos: Problemas de "Unclosed block", estilos específicos de seções/páginas,
+ *           animações globais de card (pulse, gold-pulse), footer-reveal.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------------------------------------
+   Design Tokens – V2 (system colours & spacing)
+   -------------------------------------------------- */
+
+:root {
+  /* DARK THEME (default) */
+  --color-primary: #0a58ca;        /* botões / links de ação */
+  --color-on-primary: #ffffff;    /* texto sobre cor primária */
+
+  --color-accent: #e0c178;         /* detalhes dourados / elementos de destaque */
+  --color-accent-light: #c4a96b;  /* dourado suave no dark */
+
+  --color-background: #0d1117;     /* fundo principal da aplicação */
+  --color-surface: #11161e;        /* cards / containers principais */
+  --color-on-surface: #d1d5db;     /* texto padrão sobre superfície */
+  --color-surface-light: #1a1f29; /* para cards mais escuros / elementos secundários */
+
+  /* Opposite surface for modals (contraste com o tema principal) */
+  --color-surface-opposite: #ffffff;
+  --color-on-surface-opposite: #1f2937;
+
+  /* Platform brand colours (para uso específico da marca, se houver) */
+  --stratevo-color: #1B3F8B;
+  --exceltta-color: #0F5F66;
+  --connecta-color: #0A2463;
+  --veritus-color: #5A2C45;
+  --finx-color: #1E6455;
+  --academy-color: #2C3C8B;
+  --labs-color: #4E3B76;
+  --core-color: #2A323F;
+  --engage-color: #6A3C63;
+
+  /* Card specific colours (baseadas nas variáveis de superfície) */
+  --card-bg: var(--color-surface);
+  --card-border: #1e293b;
+  --card-shadow: 0 1px 2px rgba(0,0,0,.1);
+
+  /* Spacing scale – 4-pt system (usado com 'var(--space-X)') */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+
+  /* Header height */
+  --height-header: 64px;
+
+  /* Ticker height (barrinha de notícias/informações) */
+  --height-ticker: 45px;
+}
+
+/* Light Theme Overrides (aplicadas quando a classe 'theme-light' está no body/html) */
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-primary: #0a58ca;
+    --color-on-primary: #ffffff;
+
+    --color-accent: #c79a30;
+    --color-accent-light: #f9eecd;
+
+    --color-background: #ffffff;
+    --color-surface: #f8fafc;
+    --color-on-surface: #1f2937;
+    --color-surface-light: #f1f5f9;
+
+    /* Opposite surface for modals */
+    --color-surface-opposite: #11161e;
+    --color-on-surface-opposite: #d1d5db;
+
+    /* Platform brand colours (ajustes para tema claro) */
+    --stratevo-color: #2e59a8;
+    --exceltta-color: #127e85;
+    --connecta-color: #123b9c;
+    --veritus-color: #7a4765;
+    --finx-color: #278a73;
+    --academy-color: #3c52b3;
+    --labs-color: #674f9f;
+    --core-color: #3f4d61;
+    --engage-color: #8a547e;
+
+    --card-bg: var(--color-surface);
+    --card-border: #e2e8f0;
+    --card-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+}
+
+/* Base Styles (aplicados ao 'body', ajustam-se ao tema via variáveis) */
+body {
+  background: var(--color-background);
+  color: var(--color-on-surface);
+}
+
+/* Scrollbar Styles (universal) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+
+/* --------------------------------------------------
+   Typography Base (aplicado globalmente via @layer base)
+   -------------------------------------------------- */
+@layer base {
+  h1 {
+    @apply text-3xl md:text-4xl leading-tight font-bold text-on-surface;
+  }
+  h2 {
+    @apply text-2xl md:text-3xl leading-snug font-semibold text-on-surface;
+  }
+  h3 {
+    @apply text-xl md:text-2xl leading-snug font-semibold text-on-surface;
+  }
+  p, li, span, a {
+    @apply text-base leading-relaxed text-on-surface;
+  }
+
+  /* Mobile-first typography (ajustes para telas menores) */
+  @media (max-width: 768px) {
+    h1 { @apply text-[28px]; }
+    h2 { @apply text-[22px]; }
+    h3 { @apply text-[19px]; }
+    p, li, span, a { @apply text-[15px]; }
+  }
+}
+
+/* --------------------------------------------------
+   Global Utility Components (aplicado via @layer components)
+   -------------------------------------------------- */
+@layer components {
+  /* Card Base Style */
+  .card {
+    @apply bg-[color:var(--card-bg)] border border-[color:var(--card-border)] text-[color:var(--color-on-surface)] rounded-xl shadow-md p-[var(--space-6)] md:p-[var(--space-7)] flex flex-col gap-4 mb-6 md:mb-8;
+  }
+  .card-title {
+    @apply text-xl font-semibold text-on-surface;
+  }
+  .card-list {
+    @apply list-none flex flex-col gap-3;
+  }
+  .card-list-icon {
+    @apply inline-block mr-2 text-accent;
+  }
+  .shadow-md { /* Garante que shadow-md usa o token de card-shadow */
+    box-shadow: var(--card-shadow);
+  }
+
+  /* Button Base Style (extended by Button.tsx variants) */
+  .btn {
+    @apply inline-flex items-center justify-center font-medium rounded-md transition-colors;
+  }
+
+  /* Logo Standard Style (aplicado ao elemento do logo) */
+  .logo-std {
+    @apply w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden bg-surface-light shadow-md;
+    box-shadow: 0 0 4px rgba(var(--color-accent-rgb), 0.6); /* Exemplo de sombra dourada usando RGB de accent */
+    transition: transform .25s ease;
+  }
+  .logo-std:hover {
+    transform: scale(1.05);
+  }
+
+  /* Ticker Style (para a barra de notícias/mensagens) */
+  .ticker {
+    @apply fixed top-[var(--height-header)] left-0 w-full h-[var(--height-ticker)] bg-surface border-b border-accent-light flex items-center overflow-hidden z-2000;
+  }
+  .ticker-inner {
+    @apply whitespace-nowrap;
+  }
+  .ticker-inner p {
+    @apply inline-block whitespace-nowrap text-sm text-on-surface;
+    animation: ticker-scroll 20s linear infinite; /* Definido via keyframes */
+  }
+  .ticker-inner p:hover {
+    animation-play-state: paused;
+  }
+  .ticker-inner a {
+    @apply text-accent no-underline;
+  }
+  .ticker-inner a:hover {
+    @apply opacity-90 underline;
+  }
+
+  /* Mobile Search Overlay (se usado) */
+  .search-overlay-mobile {
+    @apply fixed top-[var(--height-header)] left-0 right-0 bg-surface p-[var(--space-6)] z-[2400];
+  }
+
+  /* Theme Switcher Visual (se usado um componente de switch personalizado) */
+  .theme-switch {
+    @apply relative inline-block w-12 h-6 align-middle select-none;
+  }
+  .theme-switch input {
+    @apply hidden;
+  }
+  .switch-inner {
+    @apply absolute top-0 left-0 w-full h-full bg-[color:var(--color-background)] border border-[color:var(--color-accent)] rounded-full transition-all;
+  }
+  .switch-inner::before {
+    content: "";
+    @apply absolute w-5 h-5 bg-[color:var(--color-accent)] rounded-full top-0.5 left-0.5 transition-transform;
+  }
+  input:checked + .switch-inner::before {
+    transform: translateX(24px);
+  }
+  .switch-inner .moon-icon {
+    @apply absolute left-1 top-1 w-4 h-4 flex items-center justify-center;
+  }
+  .switch-inner .sun-icon {
+    @apply absolute right-1 top-1 w-4 h-4 flex items-center justify-center;
+  }
+
+  /* Glassmorphism Effect (aplicar a elementos específicos como classes no HTML) */
+  .glass {
+    background: linear-gradient(145deg, rgba(var(--color-surface-rgb), 0.9) 0%, rgba(var(--color-surface-light-rgb), 0.9) 100%);
+    border: 1px solid rgba(var(--color-accent-rgb), 0.25);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 4px 18px rgba(var(--color-accent-rgb), 0.08);
+    @apply rounded-xl;
+  }
+  /* Tema claro para glassmorphism */
+  body.theme-light .glass {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(var(--color-accent-rgb), 0.25);
+    box-shadow: 0 4px 14px rgba(var(--color-accent-rgb), 0.08);
+  }
+
+  /* Universal Container */
+  .container {
+    @apply max-w-6xl mx-auto px-4;
+  }
+}
+
+/* --------------------------------------------------
+   Animations
+   -------------------------------------------------- */
+/* Generic subtle pulse for hover effects etc. */
+@keyframes pulseSoft {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+/* Ticker scroll animation */
+@keyframes ticker-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* --------------------------------------------------
+   Theme Specific Overrides (usando a classe no `body` ou `html`)
+   -------------------------------------------------- */
+body.theme-light {
+  /* Força cores de texto para garantir leitura onde componentes usam classes literais como 'text-white' */
+  .text-white { color: var(--color-on-surface) !important; }
+  .text-gray-200, .text-gray-300, .text-gray-400, .text-gray-500 { color: var(--color-on-surface) !important; }
+
+  /* Garante que elementos de fundo escuro em tema claro se adaptem */
+  .bg-gray-800, .bg-gray-700, .bg-\[\#141c2f\], .bg-\[\#0a0f1d\], .bg-\[\#1a2338\] {
+    background: var(--card-bg) !important;
+    color: var(--color-on-surface) !important;
+  }
+  .border-\[\#2a3448\] {
+    border-color: var(--card-border) !important;
+  }
+
+  /* Links e ícones dentro de menus/sidebars */
+  .nav-menu a, .nav-menu-mobile .nav-item, .sidebar-nav svg,
+  .mobile-nav-toggle svg, .mobile-sidebar-toggle svg {
+    color: var(--color-primary) !important;
+  }
+  /* Ticker text in light theme for contrast */
+  .ticker-inner p, .ticker-inner a {
+    color: var(--color-primary) !important;
+  }
+}
+
+body.theme-dark {
+  /* Regras específicas para o tema escuro que possam precisar de !important para sobrepor */
+  .card-list-icon {
+    filter: invert(80%); /* Para ícones claros em fundo escuro */
+  }
+}
+
+
+/* --------------------------------------------------
+   Responsive Layout Overrides (apenas o essencial)
+   -------------------------------------------------- */
+
+/* Header Wrapper fix for mobile position (ensures it's fixed at top, accounting for safe areas) */
+.header-wrapper {
+  @apply fixed top-0 left-0 right-0 h-[var(--height-header)] bg-surface border-b-2 border-accent z-[2300];
+}
+/* Main Content top spacing (adjusts for header and ticker) */
+.main-content {
+  margin-top: calc(var(--height-header) + var(--height-ticker)); /* Default spacing for all pages */
+}
+/* Universal Container for main content */
+.content-wrapper > .main-content {
+  @apply mx-auto w-full max-w-6xl px-[var(--space-4)] md:px-0; /* Centraliza e adiciona padding lateral no mobile */
+}
+
+@media (max-width: 768px) {
+  /* Ajustes globais para mobile */
+  .desktop-only { display: none !important; } /* Garante que elementos desktop-only sumam */
+
+  /* Header mobile adjustments */
+  .header-wrapper {
+    padding-top: env(safe-area-inset-top); /* Respeita notch/status bar */
+  }
+
+  /* Sidebar mobile behavior */
+  .sidebar {
+    @apply fixed top-[var(--height-header)] left-0 h-[calc(100vh - var(--height-header))] w-64 bg-surface border-r border-card-border p-[var(--space-4)] transform -translate-x-full z-[2400] overflow-y-auto;
+    transition: transform 0.3s ease;
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Mobile floating buttons (positioned by FloatingButtons.tsx directly) */
+  /* Remove qualquer override global aqui e deixe o componente cuidar */
+
+  /* Main content mobile adjustments */
+  .main-content {
+    margin-top: calc(var(--height-header) + var(--height-ticker)); /* Mantém espaçamento consistente */
+  }
+}
+
+/* --------------------------------------------------
+   REMOVED SECTIONS (Previous problematic/unnecessary styles)
+   -------------------------------------------------- */
+/*
+   - Animação 'gold-pulse' e classe 'animate-gold-pulse' (removidas)
+   - Classes '.footer-reveal' e animações relacionadas (removidas)
+   - Overrides '.olv-card-*' (unificadas sob '.card-*')
+   - Estilos '.blog-card' e related (removidos)
+   - Estilos '.prose table' e related (removidos - específico para renderização de Markdown)
+   - Estilos para IDs de seções específicas (e.g., section#monitoramento, section#dashboard) (removidos)
+   - Regras excessivamente específicas para 'body.import-sim' (removidas - melhor controlar via componente)
+   - Regras de '.mobile-nav-toggle' e '.mobile-sidebar-toggle' são mais bem tratadas em componentes individuais.
+   - Regras de 'card-hover' e 'shadow-gold' que estavam em duplicidade com o Card.tsx.
+*/

@@ -18,7 +18,6 @@ import {
   TestTube,
   Code,
   Webhook,
-  Api,
   FileText,
   Download,
   Upload,
@@ -221,7 +220,7 @@ const Integrations = () => {
   }
 
   const tabs = [
-    { id: 'apis', name: 'APIs', icon: Api, count: integrations.apis.length },
+    { id: 'apis', name: 'APIs', icon: Server, count: integrations.apis.length },
     { id: 'webhooks', name: 'Webhooks', icon: Webhook, count: integrations.webhooks.length },
     { id: 'databases', name: 'Bancos de Dados', icon: Database, count: integrations.databases.length },
     { id: 'services', name: 'Serviços', icon: Cloud, count: integrations.services.length }
@@ -328,7 +327,7 @@ const Integrations = () => {
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center space-x-3 mb-2">
-            <Api className="w-5 h-5 text-blue-500" />
+            <Server className="w-5 h-5 text-blue-500" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {api.name}
             </h3>

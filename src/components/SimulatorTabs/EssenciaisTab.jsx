@@ -7,13 +7,14 @@ import NCMRefinementModal from '../UI/NCMRefinementModal'
 import ProductDetailsModal from '../UI/ProductDetailsModal'
 import { useDropzone } from 'react-dropzone'
 import toast from 'react-hot-toast'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, TrendingUp, TrendingDown, RefreshCw, Calendar, DollarSign, Euro, PoundSterling, CircleDollarSign } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker?url'
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 import { useUser } from '../../contexts/UserContext';
 import { FaCrown, FaEye } from 'react-icons/fa';
 import { fetchPTAXRate } from '../../utils/currency'
+import PTAXPanel from '../UI/PTAXPanel'
 
 const modais = [
   { value: 'maritimo', label: 'Marítimo', description: 'Transporte por navio - ideal para grandes volumes' },
@@ -123,6 +124,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   // Estado para controlar se o usuário editou manualmente
   const [ptaxManual, setPtaxManual] = useState(false)
   const [ptaxEditable, setPtaxEditable] = useState(false)
+  const [showPTAXPanel, setShowPTAXPanel] = useState(false)
 
   // NOVO: Resetar estados ao montar/desmontar
   useEffect(() => {
@@ -879,6 +881,14 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     }
     // Default: só marítimo e aéreo habilitados
     return modais.map(m => ({ ...m, disabled: m.value === 'rodoviario' || m.value === 'ferroviario' }))
+  }
+
+  // Função para selecionar moeda do painel PTAX
+  const handleCurrencySelect = (currencyCode, cotacao) => {
+    onChange({ ...data, moeda: currencyCode, ptax: cotacao })
+    setPtax(cotacao)
+    setPtaxInfo({ dataCotacao: ptaxData[currencyCode]?.dataCotacao, fonte: 'PTAX Banco Central' })
+    setShowPTAXPanel(false)
   }
 
   // Função para buscar cotação PTAX
@@ -2172,6 +2182,74 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
           </div>
         </div>
       )}
+
+      {/* Data de Cotação PTAX */}
+      <div>
+        <Tooltip content="Data de referência para a cotação PTAX do Banco Central">
+          <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center">
+            <svg className="w-4 h-4 mr-2 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Data de Cotação PTAX
+          </label>
+        </Tooltip>
+        <div className="flex space-x-2">
+          <input
+            type="date"
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 h-11 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            value={ptaxDate || ''}
+            onChange={e => setPtaxDate(e.target.value)}
+            max={new Date().toISOString().split('T')[0]}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPTAXPanel(!showPTAXPanel)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center space-x-2 transition-colors"
+          >
+            <DollarSign className="w-4 h-4" />
+            <span className="text-sm font-medium">Ver Cotações</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Painel PTAX */}
+      {showPTAXPanel && (
+        <div className="col-span-full mt-4">
+          <PTAXPanel
+            selectedDate={ptaxDate}
+            onCurrencySelect={handleCurrencySelect}
+            selectedCurrency={data.moeda}
+          />
+        </div>
+      )}
+
+      {/* Moeda */}
+      <div>
+        <Tooltip content="Moeda principal utilizada na negociação da importação">
+          <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center">
+            <svg className="w-4 h-4 mr-2 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+            </svg>
+            Moeda Selecionada
+          </label>
+        </Tooltip>
+        <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div className="flex items-center space-x-2">
+            {data.moeda === 'USD' && <DollarSign className="w-5 h-5 text-green-600" />}
+            {data.moeda === 'EUR' && <Euro className="w-5 h-5 text-blue-600" />}
+            {data.moeda === 'GBP' && <PoundSterling className="w-5 h-5 text-purple-600" />}
+            {data.moeda === 'JPY' && <CircleDollarSign className="w-5 h-5 text-red-600" />}
+            <span className="font-semibold text-gray-900 dark:text-white">
+              {data.moeda || 'Não selecionada'}
+            </span>
+          </div>
+          {data.ptax && (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              PTAX: R$ {parseFloat(data.ptax).toFixed(4)}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

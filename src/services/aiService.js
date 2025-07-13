@@ -13,19 +13,32 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true
 });
 
+// Cliente de IA para o frontend: faz requisições ao backend seguro
+
 class AIService {
-  constructor() {
-    this.documentCache = new Map();
-    this.cacheExpiry = 30 * 60 * 1000; // 30 minutos
+  async askOpenAI(prompt) {
+    const response = await fetch('/api/ai/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    if (!response.ok) throw new Error('Erro ao consultar IA');
+    const data = await response.json();
+    return data.result;
   }
 
-  // Métodos de extração e análise (exemplo)
-  async extractTextFromDocument(file) {
-    // Implementação básica
-    return '';
+  // Exemplo de método para sugestão de NCM
+  async suggestNCMByDescription(descricao, especificacoes = {}) {
+    const response = await fetch('/api/ai/suggest-ncm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ descricao, especificacoes })
+    });
+    if (!response.ok) throw new Error('Erro ao sugerir NCM');
+    return await response.json();
   }
 
-  // Adicione outros métodos conforme necessário...
+  // Adicione outros métodos conforme necessário, sempre chamando o backend
 }
 
 export default new AIService(); 

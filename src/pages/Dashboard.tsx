@@ -124,11 +124,11 @@ const Dashboard: React.FC = () => {
         {/* Header do Cockpit */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
+      <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Cockpit Executivo
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
                 Visão estratégica e inteligente das operações de importação
               </p>
             </div>
@@ -230,10 +230,10 @@ const Dashboard: React.FC = () => {
               </select>
             </div>
           </div>
-        </div>
+      </div>
 
         {/* KPIs Principais */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-all duration-300 group">
             <div className="flex items-center justify-between">
               <div>
@@ -334,8 +334,8 @@ const Dashboard: React.FC = () => {
                 }`}
                 role="alert"
                 aria-live="polite"
-              >
-                <div className="flex items-center">
+            >
+              <div className="flex items-center">
                   <span className="text-2xl mr-3" role="img" aria-label={alert.type}>
                     {alert.icon}
                   </span>
@@ -402,14 +402,14 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
             </div>
-          </div>
+      </div>
 
           {/* Distribuição por Modal */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-all duration-300">
-            <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Distribuição por Modal
-              </h3>
+            </h3>
               <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
                 <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
@@ -558,7 +558,7 @@ const Dashboard: React.FC = () => {
                     ></div>
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                       {data.count} simulações
-                    </div>
+                </div>
                   </div>
                   <span className="text-xs text-gray-600 dark:text-gray-400 mt-2 text-center">
                     {data.month}
@@ -632,7 +632,7 @@ const Dashboard: React.FC = () => {
               <svg className="w-8 h-8 text-orange-200 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-            </div>
+          </div>
           </button>
         </div>
       </div>

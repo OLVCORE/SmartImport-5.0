@@ -1,57 +1,53 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { Loader2 } from 'lucide-react'
+import { Brain, Loader2 } from 'lucide-react'
 
-const LoadingSpinner = ({ 
-  size = 'md', 
-  text = 'Carregando...', 
-  fullScreen = false,
-  className = '' 
-}) => {
+const LoadingSpinner = ({ message = "Carregando sistema SERP...", size = "default" }) => {
   const sizeClasses = {
-    sm: 'w-4 h-4',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12',
-    xl: 'w-16 h-16'
+    small: "w-6 h-6",
+    default: "w-8 h-8",
+    large: "w-12 h-12"
   }
 
-  const textSizes = {
-    sm: 'text-sm',
-    md: 'text-base',
-    lg: 'text-lg',
-    xl: 'text-xl'
-  }
-
-  const spinner = (
-    <div className={`flex flex-col items-center justify-center space-y-4 ${className}`}>
+  return (
+    <div className="flex flex-col items-center justify-center p-8">
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        className={`${sizeClasses[size]} text-primary-600 dark:text-primary-400`}
       >
-        <Loader2 className={`${sizeClasses[size]} text-blue-500 dark:text-blue-400`} />
+        <Brain className="w-full h-full" />
       </motion.div>
-      {text && (
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className={`${textSizes[size]} text-gray-600 dark:text-gray-300 font-medium`}
-        >
-          {text}
-        </motion.p>
-      )}
+      
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="mt-4 text-center"
+      >
+        <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+          {message}
+        </p>
+        <div className="flex items-center justify-center space-x-1 mt-2">
+          <motion.div
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            className="w-2 h-2 bg-primary-600 dark:bg-primary-400 rounded-full"
+          />
+          <motion.div
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+            className="w-2 h-2 bg-primary-600 dark:bg-primary-400 rounded-full"
+          />
+          <motion.div
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
+            className="w-2 h-2 bg-primary-600 dark:bg-primary-400 rounded-full"
+          />
+        </div>
+      </motion.div>
     </div>
   )
-
-  if (fullScreen) {
-    return (
-      <div className="fixed inset-0 bg-white dark:bg-gray-900 flex items-center justify-center z-50">
-        {spinner}
-      </div>
-    )
-  }
-
-  return spinner
 }
 
-export default LoadingSpinner 
+export default LoadingSpinner

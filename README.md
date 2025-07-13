@@ -1,257 +1,43 @@
-# SmartImport 5.0 🚀
+# Checklist de Boas Práticas – UX/UI & Layout (Padrão SmartImport 5.0)
 
-**Simulador de Importação Inteligente** - Plataforma SaaS completa para cálculo de custos de importação com IA, OCR e integrações avançadas.
+Use este checklist para garantir sofisticação, beleza e usabilidade em todos os projetos:
 
-![SmartImport 5.0](https://img.shields.io/badge/version-5.0.0-blue)
-![React](https://img.shields.io/badge/React-18.2.0-61dafb)
-![Vite](https://img.shields.io/badge/Vite-5.0.0-646cff)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0.0-3178c6)
-![License](https://img.shields.io/badge/license-MIT-green)
+## Layout & Estrutura
+- [ ] Header fixo no topo, ocupando toda a largura
+- [ ] Sidebar colapsável (apenas ícones), expande ao hover
+- [ ] Sidebar nunca sobrepõe o header
+- [ ] Conteúdo principal alinhado ao lado da sidebar
+- [ ] Footer discreto, sempre visível
+- [ ] Responsividade total (desktop, tablet, mobile)
 
-## ✨ Características
+## Visual & Estilo
+- [ ] Cores sóbrias, contraste adequado, visual limpo
+- [ ] Tipografia moderna e legível
+- [ ] Ícones modernos (ex: react-icons)
+- [ ] Sombreamento e bordas suaves para separar áreas
+- [ ] Microinterações e transições suaves
 
-### 🧠 Inteligência Artificial
-- **Classificação NCM Automática** - IA para sugerir códigos fiscais
-- **OCR Avançado** - Extração automática de dados de documentos
-- **Análise de Viabilidade** - Cálculo inteligente de rentabilidade
+## Componentização & Código
+- [ ] Componentes reutilizáveis, bem organizados
+- [ ] Props claras e documentação mínima
+- [ ] Código limpo, comentado nos pontos-chave
+- [ ] Separação de lógica e apresentação
 
-### 📊 Simulação Completa
-- **Cálculo de Impostos** - II, IPI, ICMS, PIS, COFINS, FCP
-- **Custos Logísticos** - Frete, seguro, armazenagem, movimentação
-- **Regimes Aduaneiros** - Múltiplos regimes com cálculos específicos
-- **Incentivos Fiscais** - ZFM, REIDI e outros benefícios
+## UX & Acessibilidade
+- [ ] Feedback visual para ações do usuário
+- [ ] Loading spinners e estados de carregamento
+- [ ] Navegação por teclado e acessibilidade básica (alt, aria-label)
+- [ ] Hierarquia visual clara e intuitiva
+- [ ] Mensagens de erro e sucesso amigáveis
 
-### 🔗 Integrações
-- **GitHub** - Versionamento e CI/CD
-- **OneDrive** - Backup automático
-- **ClickUp** - Gestão de tarefas
-- **APIs Externas** - Cotações, NCM, logística
-
-### 📱 Experiência Moderna
-- **PWA** - Instalável como app nativo
-- **Responsivo** - Funciona em todos os dispositivos
-- **Tema Escuro/Claro** - Interface personalizável
-- **Animações** - UX fluida e moderna
-
-## 🚀 Deploy Rápido
-
-### Pré-requisitos
-- Node.js 18+
-- npm ou yarn
-- Conta Vercel (gratuita)
-
-### Instalação Local
-```bash
-# Clone o repositório
-git clone https://github.com/seu-usuario/SmartImport-5.0.git
-cd SmartImport-5.0
-
-# Instale as dependências
-npm install
-
-# Execute em desenvolvimento
-npm run dev
-
-# Build para produção
-npm run build
-
-# Preview da build
-npm run preview
-```
-
-### Deploy Automático
-1. **Fork** este repositório
-2. Conecte ao **Vercel** (vercel.com)
-3. Importe o projeto
-4. **Deploy automático** a cada push!
-
-## 🏗️ Arquitetura
-
-```
-src/
-├── components/          # Componentes reutilizáveis
-│   ├── Layout/         # Layout principal
-│   ├── UI/            # Componentes de interface
-│   └── ErrorFallback/ # Tratamento de erros
-├── pages/             # Páginas da aplicação
-│   ├── Dashboard.jsx  # Dashboard principal
-│   ├── Simulator.jsx  # Simulador de importação
-│   ├── History.jsx    # Histórico de simulações
-│   ├── Reports.jsx    # Relatórios e análises
-│   ├── Integrations.jsx # Configuração de APIs
-│   ├── Settings.jsx   # Configurações do usuário
-│   └── Help.jsx       # Ajuda e suporte
-├── store/             # Gerenciamento de estado
-│   └── simulationStore.js # Zustand store
-├── hooks/             # Custom hooks
-├── utils/             # Utilitários
-└── styles/            # Estilos globais
-```
-
-## 🛠️ Tecnologias
-
-### Frontend
-- **React 18** - Framework principal
-- **Vite** - Build tool e dev server
-- **Tailwind CSS** - Styling
-- **Framer Motion** - Animações
-- **Zustand** - Gerenciamento de estado
-- **React Router** - Roteamento
-- **Recharts** - Gráficos e visualizações
-
-### Integrações
-- **OneDrive API** - Backup automático
-- **GitHub API** - Versionamento
-- **ClickUp API** - Gestão de tarefas
-- **Microsoft Graph** - Integração Office 365
-
-### Deploy & CI/CD
-- **Vercel** - Deploy frontend
-- **Railway** - Deploy backend (opcional)
-- **GitHub Actions** - CI/CD automático
-
-## 📊 Funcionalidades
-
-### Dashboard
-- **Métricas em Tempo Real** - Simulações, valores, lucratividade
-- **Gráficos Interativos** - Tendências e análises
-- **Atividades Recentes** - Últimas simulações
-- **Quick Actions** - Acesso rápido às funcionalidades
-
-### Simulador
-- **6 Etapas Intuitivas** - Fluxo guiado
-- **Upload de Documentos** - OCR automático
-- **Sugestões de NCM** - IA para classificação
-- **Cálculos Detalhados** - Breakdown completo de custos
-- **Resultados Visuais** - Gráficos e comparações
-
-### Histórico
-- **Filtros Avançados** - Busca por status, data, produto
-- **Ações em Lote** - Export, delete, edit
-- **Estatísticas** - Resumo de atividades
-- **Exportação** - PDF, Excel, JSON
-
-### Relatórios
-- **7 Tipos de Análise** - Visão geral, tendências, categorias
-- **Gráficos Interativos** - Barras, pizza, linha, área
-- **Exportação** - Relatórios em PDF
-- **Filtros Temporais** - 7d, 30d, 90d, 1y
-
-### Integrações
-- **APIs** - Cotações, NCM, logística
-- **Webhooks** - Notificações e sincronização
-- **Bancos de Dados** - PostgreSQL, Redis, MongoDB
-- **Serviços** - OCR, IA, Email
-
-## 🔧 Configuração
-
-### Variáveis de Ambiente
-```bash
-# .env.local
-VITE_APP_NAME=SmartImport 5.0
-VITE_APP_VERSION=5.0.0
-VITE_API_URL=https://api.smartimport.com
-VITE_ENABLE_OCR=true
-VITE_ENABLE_AI=true
-```
-
-### Integrações
-```javascript
-// Configurar OneDrive
-ONEDRIVE_CLIENT_ID=your-client-id
-ONEDRIVE_CLIENT_SECRET=your-client-secret
-
-// Configurar ClickUp
-CLICKUP_API_TOKEN=your-api-token
-CLICKUP_SPACE_ID=your-space-id
-
-// Configurar GitHub
-GITHUB_TOKEN=your-github-token
-```
-
-## 📱 PWA
-
-O SmartImport 5.0 é uma **Progressive Web App** completa:
-
-- ✅ **Instalável** - Adicione à tela inicial
-- ✅ **Offline** - Funciona sem internet
-- ✅ **Push Notifications** - Notificações em tempo real
-- ✅ **App-like** - Experiência nativa
-
-## 🔒 Segurança
-
-- **HTTPS** - Conexão segura
-- **CORS** - Configurado adequadamente
-- **Headers de Segurança** - XSS, CSRF protection
-- **Validação** - Input sanitization
-- **Backup** - Dados seguros no OneDrive
-
-## 📈 Performance
-
-- **Lighthouse Score** - 95+ em todas as métricas
-- **Bundle Size** - Otimizado com code splitting
-- **Lazy Loading** - Carregamento sob demanda
-- **Caching** - Assets com cache inteligente
-- **CDN** - Distribuição global
-
-## 🤝 Contribuindo
-
-1. **Fork** o projeto
-2. Crie uma **branch** para sua feature
-3. **Commit** suas mudanças
-4. **Push** para a branch
-5. Abra um **Pull Request**
-
-### Padrões de Código
-```bash
-# Linting
-npm run lint
-
-# Formatação
-npm run format
-
-# Testes
-npm run test
-
-# Build
-npm run build
-```
-
-## 📄 Licença
-
-Este projeto está sob a licença **MIT**. Veja o arquivo [LICENSE](LICENSE) para detalhes.
-
-## 🆘 Suporte
-
-- 📧 **Email**: suporte@smartimport.com
-- 📱 **WhatsApp**: +55 11 99999-9999
-- 📖 **Documentação**: [docs.smartimport.com](https://docs.smartimport.com)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/seu-usuario/SmartImport-5.0/issues)
-
-## 🚀 Roadmap
-
-### v5.1 (Próxima)
-- [ ] Integração com mais ERPs
-- [ ] API pública para desenvolvedores
-- [ ] App mobile nativo
-- [ ] Machine Learning avançado
-
-### v5.2 (Futuro)
-- [ ] Blockchain para auditoria
-- [ ] IA para previsão de custos
-- [ ] Integração com marketplaces
-- [ ] Analytics avançados
-
-## 🙏 Agradecimentos
-
-- **React Team** - Framework incrível
-- **Vercel** - Deploy e hosting
-- **Tailwind CSS** - Styling framework
-- **Framer Motion** - Animações
-- **Zustand** - State management
+## Extras
+- [ ] Estrutura de pastas clara (pages, components, hooks, styles, etc)
+- [ ] Pronto para integração com APIs e dados dinâmicos
+- [ ] Testes básicos de usabilidade e responsividade
 
 ---
 
-**SmartImport 5.0** - Transformando a importação com inteligência artificial e tecnologia moderna.
+**Como pedir:**
+> “Aplique o padrão visual, de layout e UX do simulador SmartImport 5.0, seguindo o checklist de boas práticas do projeto.”
 
-⭐ **Deixe uma estrela se gostou do projeto!**
+Assim, todos os projetos manterão o mesmo nível de sofisticação, beleza e experiência do usuário!

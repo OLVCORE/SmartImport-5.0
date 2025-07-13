@@ -1,162 +1,96 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import React from 'react'
 import { motion } from 'framer-motion'
 import { 
   Menu, 
-  Search, 
   Bell, 
+  Search, 
   Settings, 
-  User, 
-  LogOut,
+  User,
+  Brain,
   Sun,
-  Moon,
-  ChevronDown
+  Moon
 } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
-import toast from 'react-hot-toast'
-import { AnimatePresence } from 'framer-motion'
+import { useSERPStore } from '../../store/serpStore'
 
-const Header = ({ onMenuClick, currentPath }) => {
+const Header = ({ onMenuClick }) => {
   const { theme, toggleTheme } = useTheme()
-  const [showProfileMenu, setShowProfileMenu] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-
-  const handleSearch = (e) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      toast.success(`Buscando por: ${searchQuery}`)
-      // Implementar busca global
-    }
-  }
-
-  const handleLogout = () => {
-    toast.success('Logout realizado com sucesso!')
-    // Implementar logout
-  }
-
-  const getPageTitle = () => {
-    const titles = {
-      '/dashboard': 'Dashboard',
-      '/simulator': 'Simulador',
-      '/history': 'Histórico',
-      '/reports': 'Relatórios',
-      '/integrations': 'Integrações',
-      '/settings': 'Configurações',
-      '/help': 'Ajuda'
-    }
-    return titles[currentPath] || 'SmartImport 5.0'
-  }
+  const { systemStatus } = useSERPStore()
 
   return (
-    <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-      <div className="flex items-center justify-between px-4 py-3 lg:px-6">
+    <motion.header
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm"
+    >
+      <div className="flex items-center justify-between px-4 py-3">
         {/* Left Section */}
         <div className="flex items-center space-x-4">
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+            className="lg:hidden p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
           >
             <Menu size={20} />
           </button>
           
-          <div className="hidden lg:block">
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {getPageTitle()}
-            </h1>
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-serp-600 rounded-lg flex items-center justify-center">
+              <Brain className="w-5 h-5 text-white" />
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+                SmartImport 5.0
+              </h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Sistema SERP
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Center Section - Search */}
         <div className="flex-1 max-w-lg mx-4 hidden md:block">
-          <form onSubmit={handleSearch} className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search size={16} className="text-gray-400" />
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar simulações, produtos..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Buscar simulações, produtos, NCM..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors duration-200"
             />
-          </form>
+          </div>
         </div>
 
         {/* Right Section */}
         <div className="flex items-center space-x-2">
+          {/* System Status */}
+          <div className="hidden sm:flex items-center space-x-2 px-3 py-1 rounded-full bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs font-medium">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span>SERP Online</span>
+          </div>
+
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+            className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
           >
             {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
           </button>
 
           {/* Notifications */}
-          <button className="relative p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700">
+          <button className="relative p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
             <Bell size={20} />
-            <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-400"></span>
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
+              3
+            </span>
           </button>
 
-          {/* Profile Menu */}
-          <div className="relative">
-            <button
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex items-center space-x-2 p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700"
-            >
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <User size={16} className="text-white" />
-              </div>
-              <span className="hidden lg:block text-sm font-medium">Usuário</span>
-              <ChevronDown size={16} />
-            </button>
-
-            <AnimatePresence>
-              {showProfileMenu && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700"
-                >
-                  <Link
-                    to="/settings"
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => setShowProfileMenu(false)}
-                  >
-                    <Settings size={16} className="mr-3" />
-                    Configurações
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    <LogOut size={16} className="mr-3" />
-                    Sair
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* User Menu */}
+          <button className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
+            <User size={20} />
+          </button>
         </div>
       </div>
-
-      {/* Mobile Search */}
-      <div className="md:hidden px-4 pb-3">
-        <form onSubmit={handleSearch} className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search size={16} className="text-gray-400" />
-          </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar..."
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </form>
-      </div>
-    </header>
+    </motion.header>
   )
 }
 

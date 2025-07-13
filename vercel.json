@@ -1,12 +1,27 @@
 {
-  "version": 2,
-  "name": "smartimport-5-0",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "framework": "vite",
-  "env": {
-    "VITE_APP_NAME": "SmartImport 5.0",
-    "VITE_APP_VERSION": "5.0.0"
-  }
+  "rewrites": [
+    {
+      "source": "/api/ttce/consultar",
+      "destination": "/api/ttce/consultar.js"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/ttce/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ]
 } 

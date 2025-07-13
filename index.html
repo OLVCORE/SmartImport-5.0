@@ -6,28 +6,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <!-- Primary Meta Tags -->
-    <title>SmartImport 5.0 - Simulador Estratégico de Importação | EXCELTTA</title>
-    <meta name="title" content="SmartImport 5.0 - Simulador Estratégico de Importação | EXCELTTA" />
-    <meta name="description" content="Simulador inteligente de operações de importação com IA, OCR e análise tributária. Automatize decisões logísticas e fiscais para PMEs brasileiras." />
-    <meta name="keywords" content="import, simulador, tributário, logística, IA, OCR, COMEX, NCM, II, IPI, ICMS, PIS, COFINS, AFRMM, drawback, RECOF, ZFM" />
+    <title>SmartImport 5.0 - Sistema SERP de Simulações de Importação | EXCELTTA</title>
+    <meta name="title" content="SmartImport 5.0 - Sistema SERP de Simulações de Importação | EXCELTTA" />
+    <meta name="description" content="Sistema SERP avançado de simulações de importação com IA integrada, cálculos precisos e recomendações inteligentes para PMEs brasileiras." />
+    <meta name="keywords" content="SERP, import, simulador, IA, inteligência artificial, tributário, logística, COMEX, NCM, II, IPI, ICMS, PIS, COFINS, AFRMM, drawback, RECOF, ZFM" />
     <meta name="author" content="OLV Internacional - EXCELTTA" />
     <meta name="robots" content="index, follow" />
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://smartimport.exceltta.com/" />
-    <meta property="og:title" content="SmartImport 5.0 - Simulador Estratégico de Importação" />
-    <meta property="og:description" content="Simulador inteligente de operações de importação com IA, OCR e análise tributária. Automatize decisões logísticas e fiscais." />
-    <meta property="og:image" content="https://smartimport.exceltta.com/og-image.png" />
+    <meta property="og:url" content="https://smartimport-5-0.vercel.app/" />
+    <meta property="og:title" content="SmartImport 5.0 - Sistema SERP de Simulações de Importação" />
+    <meta property="og:description" content="Sistema SERP avançado com IA integrada para simulações precisas de importação." />
+    <meta property="og:image" content="https://smartimport-5-0.vercel.app/og-image.png" />
     <meta property="og:site_name" content="EXCELTTA" />
     <meta property="og:locale" content="pt_BR" />
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://smartimport.exceltta.com/" />
-    <meta property="twitter:title" content="SmartImport 5.0 - Simulador Estratégico de Importação" />
-    <meta property="twitter:description" content="Simulador inteligente de operações de importação com IA, OCR e análise tributária." />
-    <meta property="twitter:image" content="https://smartimport.exceltta.com/twitter-image.png" />
+    <meta property="twitter:url" content="https://smartimport-5-0.vercel.app/" />
+    <meta property="twitter:title" content="SmartImport 5.0 - Sistema SERP de Simulações de Importação" />
+    <meta property="twitter:description" content="Sistema SERP avançado com IA integrada para simulações precisas de importação." />
+    <meta property="twitter:image" content="https://smartimport-5-0.vercel.app/twitter-image.png" />
     
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#1e40af" />
@@ -35,7 +35,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="SmartImport" />
+    <meta name="apple-mobile-web-app-title" content="SmartImport 5.0" />
     
     <!-- Icons -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -54,9 +54,9 @@
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "name": "SmartImport 5.0",
-      "description": "Simulador Estratégico de Operações de Importação com IA",
-      "url": "https://smartimport.exceltta.com",
+      "name": "SmartImport 5.0 SERP",
+      "description": "Sistema SERP avançado de simulações de importação com IA integrada",
+      "url": "https://smartimport-5-0.vercel.app",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web Browser",
       "offers": {
@@ -89,7 +89,7 @@
         margin: 0;
         padding: 0;
         font-family: 'Inter', system-ui, sans-serif;
-        background-color: #f8fafc;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: #1e293b;
       }
       
@@ -100,9 +100,9 @@
       /* Loading spinner */
       .loading-spinner {
         display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 3px solid rgba(255,255,255,.3);
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255,255,255,.3);
         border-radius: 50%;
         border-top-color: #fff;
         animation: spin 1s ease-in-out infinite;
@@ -115,7 +115,7 @@
       /* Dark mode support */
       @media (prefers-color-scheme: dark) {
         html, body {
-          background-color: #0f172a;
+          background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
           color: #f1f5f9;
         }
       }
@@ -126,9 +126,10 @@
       <!-- Loading state -->
       <div class="flex items-center justify-center h-full">
         <div class="text-center">
-          <div class="loading-spinner mx-auto mb-4"></div>
-          <h1 class="text-xl font-semibold text-gray-700 dark:text-gray-300">SmartImport 5.0</h1>
-          <p class="text-sm text-gray-500 dark:text-gray-400">Carregando simulador...</p>
+          <div class="loading-spinner mx-auto mb-6"></div>
+          <h1 class="text-3xl font-bold text-white mb-2">SmartImport 5.0</h1>
+          <p class="text-lg text-white/80">Sistema SERP de Simulações de Importação</p>
+          <p class="text-sm text-white/60 mt-2">Inicializando IA e módulos avançados...</p>
         </div>
       </div>
     </div>

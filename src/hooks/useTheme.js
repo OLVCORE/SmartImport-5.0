@@ -1,32 +1,27 @@
 import { useState, useEffect } from 'react'
 
-const useTheme = () => {
+export const useTheme = () => {
   const [theme, setTheme] = useState(() => {
-    // Verificar se há tema salvo no localStorage
-    const savedTheme = localStorage.getItem('smartimport-theme')
-    if (savedTheme) {
-      return savedTheme
-    }
+    // Check localStorage first
+    const saved = localStorage.getItem('theme')
+    if (saved) return saved
     
-    // Verificar preferência do sistema
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    // Check system preference
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark'
     }
     
-    // Tema padrão
     return 'light'
   })
 
   useEffect(() => {
-    // Salvar tema no localStorage
-    localStorage.setItem('smartimport-theme', theme)
+    // Update localStorage
+    localStorage.setItem('theme', theme)
     
-    // Aplicar tema ao documento
-    const root = document.documentElement
-    root.classList.remove('light', 'dark')
-    root.classList.add(theme)
+    // Update document class
+    document.documentElement.classList.toggle('dark', theme === 'dark')
     
-    // Atualizar meta theme-color
+    // Update meta theme-color
     const metaThemeColor = document.querySelector('meta[name="theme-color"]')
     if (metaThemeColor) {
       metaThemeColor.setAttribute('content', theme === 'dark' ? '#1f2937' : '#ffffff')
@@ -34,25 +29,8 @@ const useTheme = () => {
   }, [theme])
 
   const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light')
+    setTheme(prev => prev === 'light' ? 'dark' : 'light')
   }
 
-  const setLightTheme = () => {
-    setTheme('light')
-  }
-
-  const setDarkTheme = () => {
-    setTheme('dark')
-  }
-
-  return {
-    theme,
-    toggleTheme,
-    setLightTheme,
-    setDarkTheme,
-    isDark: theme === 'dark',
-    isLight: theme === 'light'
-  }
-}
-
-export { useTheme } 
+  return { theme, setTheme, toggleTheme }
+} 

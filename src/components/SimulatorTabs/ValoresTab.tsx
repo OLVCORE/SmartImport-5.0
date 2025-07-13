@@ -1,0 +1,317 @@
+import React, { useState, useEffect } from 'react'
+import { validateRequiredFields, showValidationAlert, convertToBRL, formatDualCurrency } from '../../utils/currency'
+
+interface ValoresTabProps {
+  data: any
+  onChange: (data: any) => void
+  onNext: () => void
+  onPrev: () => void
+}
+
+const ValoresTab: React.FC<ValoresTabProps> = ({ data, onChange, onNext, onPrev }) => {
+  const [brlValues, setBrlValues] = useState({
+    valorFob: 0,
+    frete: 0,
+    seguro: 0,
+    totalCif: 0
+  })
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+
+  // Campos obrigatórios para esta aba
+  const requiredFields = ['valorFob', 'frete', 'seguro']
+
+  // Calcular valores em BRL quando moeda ou valores mudarem
+  useEffect(() => {
+    const calculateBrlValues = async () => {
+      const currency = data.moeda || 'USD'
+      const valorFob = parseFloat(data.valorFob) || 0
+      const frete = parseFloat(data.frete) || 0
+      const seguro = parseFloat(data.seguro) || 0
+
+      const brlFob = await convertToBRL(valorFob, currency)
+      const brlFrete = await convertToBRL(frete, currency)
+      const brlSeguro = await convertToBRL(seguro, currency)
+      const brlTotal = brlFob + brlFrete + brlSeguro
+
+      setBrlValues({
+        valorFob: brlFob,
+        frete: brlFrete,
+        seguro: brlSeguro,
+        totalCif: brlTotal
+      })
+    }
+
+    calculateBrlValues()
+  }, [data.valorFob, data.frete, data.seguro, data.moeda])
+
+  // Validar campos antes de prosseguir
+  const handleNext = () => {
+    const validation = validateRequiredFields(data, requiredFields)
+    
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors)
+      showValidationAlert(validation.errors)
+      return
+    }
+
+    // Validar se valores são positivos
+    const valueErrors: string[] = []
+    if (parseFloat(data.valorFob) <= 0) valueErrors.push('Valor FOB deve ser maior que zero')
+    if (parseFloat(data.frete) < 0) valueErrors.push('Frete não pode ser negativo')
+    if (parseFloat(data.seguro) < 0) valueErrors.push('Seguro não pode ser negativo')
+
+    if (valueErrors.length > 0) {
+      setValidationErrors(valueErrors)
+      showValidationAlert(valueErrors)
+      return
+    }
+
+    setValidationErrors([])
+    onNext()
+  }
+
+  // Atualizar valor com validação
+  const updateValue = (field: string, value: string) => {
+    const numValue = parseFloat(value) || 0
+    
+    // Validações específicas
+    if (field === 'valorFob' && numValue <= 0 && value !== '') {
+      alert('❌ Valor FOB deve ser maior que zero')
+      return
+    }
+    
+    if ((field === 'frete' || field === 'seguro') && numValue < 0) {
+      alert('❌ Valor não pode ser negativo')
+      return
+    }
+
+    onChange({ [field]: value })
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Alerta de validação */}
+      {validationErrors.length > 0 && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                Campos com erro:
+              </h3>
+              <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                <ul className="list-disc list-inside">
+                  {validationErrors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Informações da moeda */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+        <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
+          Moeda Selecionada: {data.moeda || 'Não definida'}
+        </h3>
+        <p className="text-sm text-blue-700 dark:text-blue-300">
+          Todos os valores serão convertidos para BRL usando PTAX do Banco Central
+        </p>
+      </div>
+
+      {/* Valores FOB */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          Valor FOB (Free On Board)
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Valor FOB * <span className="text-red-500">(Obrigatório)</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={data.valorFob || ''}
+              onChange={e => updateValue('valorFob', e.target.value)}
+              placeholder="Ex: 1000.00"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Valor da mercadoria no país de origem
+            </p>
+          </div>
+          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Valor em BRL (PTAX)
+            </label>
+            <div className="text-lg font-semibold text-green-600 dark:text-green-400">
+              {formatDualCurrency(
+                parseFloat(data.valorFob) || 0,
+                data.moeda || 'USD',
+                brlValues.valorFob
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Frete e Seguro */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          Frete e Seguro
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Frete * <span className="text-red-500">(Obrigatório)</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={data.frete || ''}
+              onChange={e => updateValue('frete', e.target.value)}
+              placeholder="Ex: 200.00"
+              required
+            />
+            <div className="mt-2 bg-gray-50 dark:bg-gray-700 p-2 rounded">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {formatDualCurrency(
+                  parseFloat(data.frete) || 0,
+                  data.moeda || 'USD',
+                  brlValues.frete
+                )}
+              </span>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Seguro * <span className="text-red-500">(Obrigatório)</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={data.seguro || ''}
+              onChange={e => updateValue('seguro', e.target.value)}
+              placeholder="Ex: 150.00"
+              required
+            />
+            <div className="mt-2 bg-gray-50 dark:bg-gray-700 p-2 rounded">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {formatDualCurrency(
+                  parseFloat(data.seguro) || 0,
+                  data.moeda || 'USD',
+                  brlValues.seguro
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Resumo CIF */}
+      <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-lg border border-green-200 dark:border-green-800">
+        <h3 className="text-lg font-semibold text-green-900 dark:text-green-100 mb-4">
+          Resumo CIF (Cost, Insurance, Freight)
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="text-center">
+            <div className="text-sm text-green-700 dark:text-green-300">FOB</div>
+            <div className="text-lg font-bold text-green-900 dark:text-green-100">
+              {formatDualCurrency(
+                parseFloat(data.valorFob) || 0,
+                data.moeda || 'USD',
+                brlValues.valorFob
+              )}
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-green-700 dark:text-green-300">+ Frete</div>
+            <div className="text-lg font-bold text-green-900 dark:text-green-100">
+              {formatDualCurrency(
+                parseFloat(data.frete) || 0,
+                data.moeda || 'USD',
+                brlValues.frete
+              )}
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-green-700 dark:text-green-300">+ Seguro</div>
+            <div className="text-lg font-bold text-green-900 dark:text-green-100">
+              {formatDualCurrency(
+                parseFloat(data.seguro) || 0,
+                data.moeda || 'USD',
+                brlValues.seguro
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-green-200 dark:border-green-800">
+          <div className="text-center">
+            <div className="text-lg font-semibold text-green-700 dark:text-green-300">= CIF Total</div>
+            <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+              {formatDualCurrency(
+                (parseFloat(data.valorFob) || 0) + (parseFloat(data.frete) || 0) + (parseFloat(data.seguro) || 0),
+                data.moeda || 'USD',
+                brlValues.totalCif
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Percentuais */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+        <h4 className="text-md font-semibold text-blue-900 dark:text-blue-100 mb-2">
+          Percentuais sobre FOB
+        </h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="text-blue-700 dark:text-blue-300">Frete/FOB:</span>
+            <span className="ml-2 font-semibold text-blue-900 dark:text-blue-100">
+              {parseFloat(data.valorFob) > 0 ? 
+                (((parseFloat(data.frete) || 0) / parseFloat(data.valorFob)) * 100).toFixed(2) : '0.00'}%
+            </span>
+          </div>
+          <div>
+            <span className="text-blue-700 dark:text-blue-300">Seguro/FOB:</span>
+            <span className="ml-2 font-semibold text-blue-900 dark:text-blue-100">
+              {parseFloat(data.valorFob) > 0 ? 
+                (((parseFloat(data.seguro) || 0) / parseFloat(data.valorFob)) * 100).toFixed(2) : '0.00'}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-between">
+        <button type="button" className="px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md" onClick={onPrev}>Voltar</button>
+        <button 
+          type="button" 
+          className={`px-6 py-2 rounded-md font-semibold ${
+            validationErrors.length === 0 && data.valorFob && data.frete && data.seguro
+              ? 'bg-green-600 hover:bg-green-700 text-white'
+              : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+          }`}
+          onClick={handleNext}
+          disabled={validationErrors.length > 0 || !data.valorFob || !data.frete || !data.seguro}
+        >
+          {validationErrors.length === 0 ? 'Próxima Etapa' : 'Corrija os erros'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default ValoresTab 

@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 
 // Layout Components
 import Layout from './components/Layout/Layout'
@@ -16,19 +17,21 @@ import Settings from './pages/Settings'
 import Help from './pages/Help'
 
 // Hooks
-import { useTheme } from './hooks/useTheme'
+import { useSERPStore } from './store/serpStore'
 
-// Store
-import { useSimulationStore } from './store/simulationStore'
-
-function App() {
+function AppContent() {
   const { theme } = useTheme()
-  const { initializeStore } = useSimulationStore()
+  const { initializeSERP } = useSERPStore()
 
   useEffect(() => {
-    initializeStore()
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-  }, [theme, initializeStore])
+    // Initialize SERP System
+    initializeSERP()
+    
+    console.log('🎯 SERP System initialized with theme:', theme)
+    console.log('🎯 App routes configured:', [
+      '/', '/dashboard', '/simulator', '/history', '/reports', '/integrations', '/settings', '/help'
+    ])
+  }, [theme, initializeSERP])
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
@@ -36,46 +39,32 @@ function App() {
         ? 'bg-gray-900 text-white' 
         : 'bg-gray-50 text-gray-900'
     }`}>
-      <Layout>
-        <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={<LoadingSpinner />}>
+        <AnimatePresence mode="wait">
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/simulator" element={<Simulator />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/integrations" element={<Integrations />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/help" element={<Help />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="simulator" element={<Simulator />} />
+              <Route path="history" element={<History />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="integrations" element={<Integrations />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="help" element={<Help />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
           </Routes>
-        </Suspense>
-      </Layout>
-      
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: theme === 'dark' ? '#374151' : '#ffffff',
-            color: theme === 'dark' ? '#ffffff' : '#374151',
-            border: theme === 'dark' ? '1px solid #4B5563' : '1px solid #E5E7EB',
-          },
-          success: {
-            iconTheme: {
-              primary: '#10B981',
-              secondary: '#ffffff',
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: '#EF4444',
-              secondary: '#ffffff',
-            },
-          },
-        }}
-      />
+        </AnimatePresence>
+      </Suspense>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   )
 }
 

@@ -1,4 +1,4 @@
-import { format } from 'currency.js'
+import currency from 'currency.js'
 
 // Configurações de moedas
 const CURRENCY_CONFIGS = {
@@ -6,23 +6,115 @@ const CURRENCY_CONFIGS = {
     symbol: 'R$',
     precision: 2,
     decimal: ',',
-    thousand: '.',
-    format: '%s %v'
+    thousand: '.'
   },
   USD: {
     symbol: '$',
     precision: 2,
     decimal: '.',
-    thousand: ',',
-    format: '%s%v'
+    thousand: ','
   },
   EUR: {
     symbol: '€',
     precision: 2,
     decimal: ',',
-    thousand: '.',
-    format: '%v %s'
+    thousand: '.'
+  },
+  CNY: {
+    symbol: '¥',
+    precision: 2,
+    decimal: '.',
+    thousand: ','
   }
+}
+
+// Taxas PTAX de referência (serão atualizadas via API)
+const PTAX_RATES = {
+  USD: 5.15,
+  EUR: 5.65,
+  CNY: 0.72,
+  BRL: 1.00
+}
+
+/**
+ * Busca taxa PTAX atual do Banco Central
+ * @param {string} currency - Código da moeda
+ * @returns {Promise<number>} Taxa de câmbio
+ */
+export const fetchPTAXRate = async (currency = 'USD') => {
+  try {
+    // TODO: Integrar com API do Banco Central
+    // Por enquanto, retorna taxa de referência
+    return PTAX_RATES[currency] || 1.0
+  } catch (error) {
+    console.error('Erro ao buscar PTAX:', error)
+    return PTAX_RATES[currency] || 1.0
+  }
+}
+
+/**
+ * Converte valor para BRL usando PTAX
+ * @param {number} value - Valor a ser convertido
+ * @param {string} fromCurrency - Moeda de origem
+ * @returns {Promise<number>} Valor em BRL
+ */
+export const convertToBRL = async (value, fromCurrency) => {
+  if (fromCurrency === 'BRL') return value
+  
+  const rate = await fetchPTAXRate(fromCurrency)
+  return value * rate
+}
+
+/**
+ * Formata valor em duas colunas: original e BRL
+ * @param {number} value - Valor original
+ * @param {string} currency - Moeda original
+ * @param {number} brlValue - Valor em BRL
+ * @returns {string} String formatada
+ */
+export const formatDualCurrency = (value, currency, brlValue) => {
+  const original = formatCurrency(value, currency)
+  const brl = formatCurrency(brlValue, 'BRL')
+  return `${original} (${brl})`
+}
+
+/**
+ * Valida campos obrigatórios
+ * @param {object} data - Dados a serem validados
+ * @param {array} requiredFields - Lista de campos obrigatórios
+ * @returns {object} Resultado da validação
+ */
+export const validateRequiredFields = (data, requiredFields) => {
+  const errors = []
+  const missing = []
+
+  requiredFields.forEach(field => {
+    const value = data[field]
+    if (!value || (typeof value === 'string' && value.trim() === '') || 
+        (Array.isArray(value) && value.length === 0)) {
+      missing.push(field)
+      errors.push(`Campo obrigatório: ${field}`)
+    }
+  })
+
+  return {
+    isValid: missing.length === 0,
+    errors,
+    missing
+  }
+}
+
+/**
+ * Exibe alerta de validação
+ * @param {array} errors - Lista de erros
+ */
+export const showValidationAlert = (errors) => {
+  if (errors.length > 0) {
+    const message = errors.join('\n')
+    alert(`❌ Campos obrigatórios não preenchidos:\n\n${message}`)
+    return false
+  }
+  return true
 }
 
 /**
@@ -31,12 +123,21 @@ const CURRENCY_CONFIGS = {
  * @param {string} currency - Código da moeda (BRL, USD, EUR)
  * @returns {string} Valor formatado
  */
-export const formatCurrency = (value, currency = 'BRL') => {
+export const formatCurrency = (value, currencyCode = 'BRL') => {
   if (value === null || value === undefined || isNaN(value)) {
-    return format(0, CURRENCY_CONFIGS[currency])
+    const config = CURRENCY_CONFIGS[currencyCode] || CURRENCY_CONFIGS.BRL
+    return `${config.symbol} 0,00`
   }
   
-  return format(value, CURRENCY_CONFIGS[currency])
+  const config = CURRENCY_CONFIGS[currencyCode] || CURRENCY_CONFIGS.BRL
+  const formatted = new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: currencyCode,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value)
+  
+  return formatted
 }
 
 /**

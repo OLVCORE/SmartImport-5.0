@@ -39,16 +39,39 @@ const PTAX_RATES = {
 /**
  * Busca taxa PTAX atual do Banco Central
  * @param {string} currency - Código da moeda
- * @returns {Promise<number>} Taxa de câmbio
+ * @param {string} date - Data no formato 'MM-DD-YYYY' (opcional, default hoje)
+ * @returns {Promise<{cotacao: number, dataCotacao: string, fonte: string}>}
  */
-export const fetchPTAXRate = async (currency = 'USD') => {
+export const fetchPTAXRate = async (currency = 'USD', date) => {
+  if (currency === 'BRL') {
+    // Para BRL, a cotação é sempre 1.0, data de hoje, fonte fixa
+    return {
+      cotacao: 1.0,
+      dataCotacao: new Date().toISOString().slice(0, 10),
+      fonte: 'PTAX Banco Central'
+    }
+  }
   try {
-    // TODO: Integrar com API do Banco Central
-    // Por enquanto, retorna taxa de referência
-    return PTAX_RATES[currency] || 1.0
+    // Se não passar data, usa hoje
+    let dataParam = date
+    if (!dataParam) {
+      const now = new Date()
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      const dd = String(now.getDate()).padStart(2, '0')
+      const yyyy = now.getFullYear()
+      dataParam = `${mm}-${dd}-${yyyy}`
+    }
+    const res = await fetch(`/api/ptax?moeda=${currency}&data=${dataParam}`)
+    if (!res.ok) return { cotacao: PTAX_RATES[currency] || 1.0, dataCotacao: null, fonte: 'PTAX Banco Central' }
+    const json = await res.json()
+    return {
+      cotacao: json.cotacao || PTAX_RATES[currency] || 1.0,
+      dataCotacao: json.dataCotacao || dataParam,
+      fonte: json.fonte || 'PTAX Banco Central'
+    }
   } catch (error) {
     console.error('Erro ao buscar PTAX:', error)
-    return PTAX_RATES[currency] || 1.0
+    return { cotacao: PTAX_RATES[currency] || 1.0, dataCotacao: null, fonte: 'PTAX Banco Central' }
   }
 }
 

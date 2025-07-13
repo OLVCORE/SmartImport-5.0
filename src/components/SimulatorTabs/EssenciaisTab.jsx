@@ -13,6 +13,7 @@ import pdfjsWorker from 'pdfjs-dist/build/pdf.worker?url'
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 import { useUser } from '../../contexts/UserContext';
 import { FaCrown, FaEye } from 'react-icons/fa';
+import { fetchPTAXRate } from '../../utils/currency'
 
 const modais = [
   { value: 'maritimo', label: 'Marítimo', description: 'Transporte por navio - ideal para grandes volumes' },
@@ -23,9 +24,15 @@ const modais = [
 
 const moedas = [
   { value: 'USD', label: 'USD - Dólar Americano', description: 'Moeda mais utilizada no comércio internacional' },
-  { value: 'BRL', label: 'BRL - Real Brasileiro', description: 'Moeda nacional do Brasil' },
   { value: 'EUR', label: 'EUR - Euro', description: 'Moeda da União Europeia' },
-  { value: 'CNY', label: 'CNY - Yuan Chinês', description: 'Moeda da China - importante para importações asiáticas' }
+  { value: 'JPY', label: 'JPY - Iene Japonês', description: 'Moeda do Japão' },
+  { value: 'GBP', label: 'GBP - Libra Esterlina', description: 'Moeda do Reino Unido' },
+  { value: 'ARS', label: 'ARS - Peso Argentino', description: 'Moeda da Argentina' },
+  { value: 'CNY', label: 'CNY - Yuan Chinês', description: 'Moeda da China' },
+  { value: 'CHF', label: 'CHF - Franco Suíço', description: 'Moeda da Suíça' },
+  { value: 'CAD', label: 'CAD - Dólar Canadense', description: 'Moeda do Canadá' },
+  { value: 'AUD', label: 'AUD - Dólar Australiano', description: 'Moeda da Austrália' },
+  { value: 'BRL', label: 'BRL - Real Brasileiro', description: 'Moeda nacional do Brasil' },
 ]
 
 // Limite de páginas e caracteres para processamento inicial
@@ -105,7 +112,17 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   const [limiteAtingido, setLimiteAtingido] = useState(false);
 
   // Adicionar no início do componente EssenciaisTab:
-  const [ptax, setPtax] = useState(data.ptax || 5.15)
+  const [ptax, setPtax] = useState(data.ptax || '')
+  // Adicionar estado para data da cotação
+  const [ptaxDate, setPtaxDate] = useState(() => {
+    const now = new Date()
+    return now.toISOString().slice(0, 10) // yyyy-mm-dd
+  })
+  // Adicionar estado para fonte e data da cotação
+  const [ptaxInfo, setPtaxInfo] = useState({ dataCotacao: '', fonte: '' })
+  // Estado para controlar se o usuário editou manualmente
+  const [ptaxManual, setPtaxManual] = useState(false)
+  const [ptaxEditable, setPtaxEditable] = useState(false)
 
   // NOVO: Resetar estados ao montar/desmontar
   useEffect(() => {
@@ -864,6 +881,63 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     return modais.map(m => ({ ...m, disabled: m.value === 'rodoviario' || m.value === 'ferroviario' }))
   }
 
+  // Função para buscar cotação PTAX
+  const buscarCotacao = async () => {
+    if (!data.moeda || !ptaxDate) return
+    const [yyyy, mm, dd] = ptaxDate.split('-')
+    const dataParam = `${mm}-${dd}-${yyyy}`
+    try {
+      const { cotacao, dataCotacao, fonte } = await fetchPTAXRate(data.moeda, dataParam)
+      setPtax(cotacao)
+      setPtaxInfo({ dataCotacao, fonte })
+      setPtaxEditable(false) // Torna read-only após buscar
+      onChange({ ...data, ptax: cotacao })
+    } catch (err) {
+      setPtax('')
+      setPtaxInfo({ dataCotacao: '', fonte: '' })
+      alert('Erro ao buscar PTAX do Banco Central. Verifique sua conexão ou tente novamente mais tarde.')
+      console.error('Erro ao buscar PTAX:', err)
+    }
+  }
+
+  // Buscar PTAX do dia automaticamente ao selecionar moeda ou ao abrir a tela
+  useEffect(() => {
+    if (!data.moeda || !ptaxDate || ptaxManual) return
+    const [yyyy, mm, dd] = ptaxDate.split('-')
+    const dataParam = `${mm}-${dd}-${yyyy}`
+    fetchPTAXRate(data.moeda, dataParam)
+      .then(({ cotacao, dataCotacao, fonte }) => {
+        setPtax(cotacao)
+        setPtaxInfo({ dataCotacao, fonte })
+        onChange({ ...data, ptax: cotacao })
+      })
+      .catch((err) => {
+        setPtax('')
+        setPtaxInfo({ dataCotacao: '', fonte: '' })
+        alert('Erro ao buscar PTAX do Banco Central. Verifique sua conexão ou tente novamente mais tarde.')
+        console.error('Erro ao buscar PTAX:', err)
+      })
+  }, [data.moeda, ptaxDate, ptaxManual])
+
+  // Função para buscar cotação manualmente (botão)
+  const buscarCotacaoManual = async () => {
+    if (!data.moeda || !ptaxDate) return
+    const [yyyy, mm, dd] = ptaxDate.split('-')
+    const dataParam = `${mm}-${dd}-${yyyy}`
+    try {
+      const { cotacao, dataCotacao, fonte } = await fetchPTAXRate(data.moeda, dataParam)
+      setPtax(cotacao)
+      setPtaxInfo({ dataCotacao, fonte })
+      setPtaxManual(false) // volta ao modo automático
+      onChange({ ...data, ptax: cotacao })
+    } catch (err) {
+      setPtax('')
+      setPtaxInfo({ dataCotacao: '', fonte: '' })
+      alert('Erro ao buscar PTAX do Banco Central. Verifique sua conexão ou tente novamente mais tarde.')
+      console.error('Erro ao buscar PTAX:', err)
+    }
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 max-w-6xl mx-auto">
       <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Dados Essenciais</h2>
@@ -1091,22 +1165,56 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
             </select>
             {/* Bloco de PTAX logo abaixo da seleção de moeda */}
             <div className="mt-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded flex flex-col md:flex-row gap-4 items-center">
-              <div>
+              <div className="flex flex-col mt-2 w-full">
                 <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Cotação PTAX</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  min="0.0001"
-                  className="px-3 py-2 border border-blue-300 dark:border-blue-600 rounded-md bg-white dark:bg-gray-700 text-blue-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={ptax}
-                  onChange={e => {
-                    setPtax(e.target.value)
-                    onChange({ ...data, ptax: e.target.value })
-                  }}
-                  placeholder="Ex: 5.15"
-                  required
-                />
-                <span className="text-xs text-blue-500 ml-2">(PTAX do Banco Central - editável)</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.0001"
+                    min="0.0001"
+                    className="w-full px-3 py-2 border border-blue-300 dark:border-blue-600 rounded-md bg-white dark:bg-gray-700 text-blue-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={ptax}
+                    onChange={e => {
+                      setPtax(e.target.value)
+                      onChange({ ...data, ptax: e.target.value })
+                    }}
+                    placeholder="Ex: 5.15"
+                    required
+                    readOnly={!ptaxEditable}
+                  />
+                  <button
+                    type="button"
+                    className="ml-2 px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-700 text-xs"
+                    onClick={() => setPtaxEditable(true)}
+                    title="Permitir edição manual da cotação PTAX"
+                    disabled={ptaxEditable}
+                  >Editar</button>
+                </div>
+                <span className="text-xs text-blue-500">
+                  (PTAX do Banco Central - {ptaxEditable ? 'editável' : 'automática'})
+                  {ptaxInfo.dataCotacao && (
+                    <> | Fonte: {ptaxInfo.fonte} | Data: {ptaxInfo.dataCotacao.split('-').reverse().join('/')}</>
+                  )}
+                </span>
+              </div>
+              {/* Campo de seleção de data e botão buscar cotação */}
+              <div className="flex flex-col md:flex-row md:items-end items-stretch gap-2 mt-2 w-full">
+                <div className="flex-1 min-w-[140px]">
+                  <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Data da cotação:</label>
+                  <input
+                    type="date"
+                    className="w-full px-2 py-1 border border-blue-300 dark:border-blue-600 rounded bg-white dark:bg-gray-700 text-blue-900 dark:text-white"
+                    value={ptaxDate}
+                    onChange={e => setPtaxDate(e.target.value)}
+                    max={new Date().toISOString().slice(0, 10)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="h-10 px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 text-xs transition-all duration-150 min-w-[120px] self-end md:self-auto"
+                  onClick={buscarCotacao}
+                  title="Buscar cotação PTAX do Banco Central para a data selecionada"
+                >Buscar Cotação</button>
               </div>
             </div>
           </div>

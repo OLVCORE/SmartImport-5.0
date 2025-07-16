@@ -1,6 +1,6 @@
 {
   "name": "smartimport-5.0",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "SmartImport 5.0 - Sistema SERP de Simulações de Importação com IA",
   "type": "module",
   "scripts": {
@@ -14,7 +14,9 @@
     "start": "node scripts/start-simple.js",
     "start-full": "node scripts/port-manager.js",
     "deploy": "vercel --prod",
-    "fix": "node scripts/fix-system.js"
+    "deploy-ptax": "node scripts/deploy-ptax.js && git add . && git commit -m \"feat: PTAX API v5.0.1 com fallback prioritário\" && git push origin main",
+    "fix": "node scripts/fix-system.js",
+    "ptax-check": "node scripts/deploy-ptax.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",

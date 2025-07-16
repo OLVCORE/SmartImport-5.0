@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import toast from 'react-hot-toast'
-import { getPtaxRateWithFallback } from '../services/ptaxService.js'
+import { getPtaxRateWithFallback, isFutureDate } from '../services/ptaxService.js'
 
 // Mock data para demonstração
 const mockSimulations = [
@@ -170,6 +170,7 @@ export const useSimulationStore = create(
       ptaxData: {},
       ptaxLoading: false,
       ptaxError: null,
+      ptaxLastUpdate: null,
       
       // Customs data
       customsRegimes: mockCustomsRegimes,
@@ -188,16 +189,23 @@ export const useSimulationStore = create(
 
       // Actions
       setLoading: (loading) => set({ isLoading: loading }),
-      
       setError: (error) => set({ error }),
-      
       clearError: () => set({ error: null }),
 
-      // PTAX Actions
+      // PTAX Actions - CORREÇÃO 5: Reação automática
       fetchPtaxRate: async (moeda, data) => {
         set({ ptaxLoading: true, ptaxError: null })
         
         try {
+          // Verificar se é data futura
+          if (isFutureDate(data)) {
+            set({ 
+              ptaxLoading: false, 
+              ptaxError: 'Data futura - use modo manual' 
+            })
+            throw new Error('Data futura - use modo manual')
+          }
+          
           const resultado = await getPtaxRateWithFallback(moeda, data)
           
           set((state) => ({
@@ -205,33 +213,76 @@ export const useSimulationStore = create(
               ...state.ptaxData,
               [moeda]: resultado
             },
-            ptaxLoading: false
+            ptaxLoading: false,
+            ptaxLastUpdate: new Date().toISOString()
           }))
           
+          // Atualizar simulação atual se existir
+          const currentSim = get().currentSimulation
+          if (currentSim) {
+            set({
+              currentSimulation: {
+                ...currentSim,
+                moeda,
+                ptax: resultado.cotacao,
+                ptaxData: resultado.dataCotacao
+              }
+            })
+          }
+          
+          console.log(`✅ PTAX atualizado no store:`, resultado)
           return resultado
+          
         } catch (error) {
           set({ 
             ptaxLoading: false, 
             ptaxError: error.message 
           })
           
+          console.error(`❌ Erro PTAX no store:`, error)
           toast.error(`Erro ao buscar PTAX: ${error.message}`)
           throw error
         }
       },
 
-      updatePtaxInSimulation: (moeda, cotacao, dataCotacao) => {
-        set((state) => {
-          if (!state.currentSimulation) return state
-          
-          return {
+      // Atualizar PTAX manual
+      updatePtaxManual: (moeda, cotacao, dataCotacao) => {
+        const resultado = {
+          cotacao: parseFloat(cotacao),
+          dataCotacao: dataCotacao || new Date().toISOString().split('T')[0],
+          fonte: 'Manual'
+        }
+        
+        set((state) => ({
+          ptaxData: {
+            ...state.ptaxData,
+            [moeda]: resultado
+          },
+          ptaxLastUpdate: new Date().toISOString()
+        }))
+        
+        // Atualizar simulação atual
+        const currentSim = get().currentSimulation
+        if (currentSim) {
+          set({
             currentSimulation: {
-              ...state.currentSimulation,
+              ...currentSim,
               moeda,
-              ptax: cotacao,
-              ptaxData: dataCotacao
+              ptax: resultado.cotacao,
+              ptaxData: resultado.dataCotacao
             }
-          }
+          })
+        }
+        
+        console.log(`✅ PTAX manual atualizado:`, resultado)
+      },
+
+      // Limpar PTAX
+      clearPtax: () => {
+        set({ 
+          ptaxData: {}, 
+          ptaxError: null, 
+          ptaxLastUpdate: null 
         })
       },
 
@@ -425,7 +476,8 @@ export const useSimulationStore = create(
         simulations: state.simulations,
         currentSimulation: state.currentSimulation,
         settings: state.settings,
-        ptaxData: state.ptaxData
+        ptaxData: state.ptaxData,
+        ptaxLastUpdate: state.ptaxLastUpdate
       })
     }
   )

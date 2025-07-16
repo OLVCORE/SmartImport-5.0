@@ -16,6 +16,8 @@ import { FaCrown, FaEye } from 'react-icons/fa';
 import { fetchPTAXRate } from '../../utils/currency'
 import PTAXPanel from '../UI/PTAXPanel'
 import { getPtaxRateWithFallback } from '../../services/ptaxService.js'
+import { useSimulationStore } from '../../store/simulationStore'
+import { getPtaxRateWithFallback, isFutureDate } from '../../services/ptaxService.js'
 
 const modais = [
   { value: 'maritimo', label: 'Marítimo', description: 'Transporte por navio - ideal para grandes volumes' },
@@ -82,6 +84,15 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   const userContext = useUser();
   const user = userContext?.user;
   const setUser = userContext?.setUser;
+  
+  // Store PTAX
+  const { 
+    fetchPtaxRate, 
+    updatePtaxManual, 
+    ptaxData, 
+    ptaxLoading, 
+    ptaxError 
+  } = useSimulationStore()
   
   const [uf, setUf] = useState(data.ufDesembaraco || '')
   const [ufDestino, setUfDestino] = useState(data.ufDestino || '')
@@ -151,20 +162,58 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     }
   }
 
-  // Função para aplicar PTAX manual - CORRIGIDA
+  // CORREÇÃO 5: useEffect para reação automática
+  useEffect(() => {
+    if (!data.moeda || !ptaxDate || ptaxManual) return
+    
+    console.log(`🔄 Auto-fetch PTAX: ${data.moeda} para ${ptaxDate}`)
+    
+    // Verificar se é data futura
+    if (isFutureDate(ptaxDate)) {
+      console.log(`⚠️ Data futura detectada: ${ptaxDate}`)
+      setPtaxMode('manual')
+      setPtaxManualValue('')
+      setPtax('')
+      setPtaxInfo({ dataCotacao: '', fonte: '' })
+      return
+    }
+    
+    // Buscar PTAX automaticamente
+    fetchPtaxRate(data.moeda, ptaxDate)
+      .then((resultado) => {
+        setPtax(resultado.cotacao)
+        setPtaxInfo({ dataCotacao: resultado.dataCotacao, fonte: resultado.fonte })
+        onChange({ ...data, ptax: resultado.cotacao })
+        console.log(`✅ PTAX automático aplicado:`, resultado)
+      })
+      .catch((err) => {
+        console.error('❌ Erro PTAX automático:', err)
+        setPtax('')
+        setPtaxInfo({ dataCotacao: '', fonte: '' })
+        
+        // Se for data futura, forçar modo manual
+        if (isFutureDate(ptaxDate)) {
+          setPtaxMode('manual')
+          setPtaxManualValue('')
+        }
+      })
+  }, [data.moeda, ptaxDate, ptaxManual, fetchPtaxRate, onChange])
+
+  // Função para aplicar PTAX manual - ATUALIZADA
   const applyManualPtax = () => {
     const valor = parseFloat(ptaxManualValue.replace(',', '.'))
     if (!isNaN(valor) && valor > 0) {
       setPtax(valor)
       setPtaxInfo({ dataCotacao: ptaxDate, fonte: 'Manual' })
       setPtaxMode('manual')
+      
+      // Atualizar store
+      updatePtaxManual(data.moeda, valor, ptaxDate)
+      
       onChange({ ...data, ptax: valor })
       console.log('✅ PTAX manual aplicado:', valor)
       
-      // Forçar atualização do estado
-      setTimeout(() => {
-        onChange({ ...data, ptax: valor })
-      }, 100)
+      toast.success('PTAX manual aplicado com sucesso!')
     } else {
       alert('Por favor, insira um valor válido para o PTAX (ex: 5,50 ou 5.50)')
     }
@@ -957,12 +1006,9 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     setLoadingPtax(true)
     
     try {
-      const [yyyy, mm, dd] = ptaxDate.split('-')
-      const dataParam = `${mm}-${dd}-${yyyy}`
+      console.log(`🔍 Buscando PTAX: ${data.moeda} para ${ptaxDate}`)
       
-      console.log(`🔍 Buscando PTAX: ${data.moeda} para ${dataParam}`)
-      
-      const resultado = await getPtaxRateWithFallback(data.moeda, dataParam)
+      const resultado = await fetchPtaxRate(data.moeda, ptaxDate)
       
       setPtax(resultado.cotacao)
       setPtaxInfo({ dataCotacao: resultado.dataCotacao, fonte: resultado.fonte })
@@ -1085,7 +1131,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     }
   }
 
-  // Função para lidar com mudança de data
+  // Função para lidar com mudança de data - ATUALIZADA
   const handleDateChange = (newDate) => {
     setPtaxDate(newDate)
     
@@ -1095,6 +1141,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
       setPtaxManualValue('')
       setPtax('')
       setPtaxInfo({ dataCotacao: '', fonte: '' })
+      toast.info('Data futura selecionada. Use o modo manual para inserir PTAX.')
     } else if (ptaxMode === 'auto' && data.moeda) {
       // Se for data passada/atual e modo automático, buscar PTAX
       buscarCotacaoComData(newDate)

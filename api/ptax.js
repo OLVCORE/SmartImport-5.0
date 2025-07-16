@@ -1,5 +1,14 @@
-// PTAX API - VERSÃO DEFINITIVA PARA VERCEL
+// PTAX API - VERSÃO DEFINITIVA COM TODAS AS CORREÇÕES
 export default async function handler(req, res) {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+  
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido' })
   }
@@ -21,20 +30,39 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Converter formato MM-DD-YYYY para YYYY-MM-DD (formato Banco Central)
-    const [mm, dd, yyyy] = data.split('-')
-    const dataISO = `${yyyy}-${mm}-${dd}`
+    // CORREÇÃO 1: Detectar formato de data automaticamente
+    let dataISO
+    if (data.includes('-')) {
+      const parts = data.split('-')
+      if (parts[0].length === 4) {
+        // Já está em YYYY-MM-DD
+        dataISO = data
+      } else if (parts[0].length === 2) {
+        // Está em MM-DD-YYYY ou DD-MM-YYYY
+        if (parseInt(parts[0]) > 12) {
+          // DD-MM-YYYY
+          const [dd, mm, yyyy] = parts
+          dataISO = `${yyyy}-${mm}-${dd}`
+        } else {
+          // MM-DD-YYYY
+          const [mm, dd, yyyy] = parts
+          dataISO = `${yyyy}-${mm}-${dd}`
+        }
+      }
+    } else {
+      throw new Error('Formato de data inválido')
+    }
     
-    console.log(`🔍 Buscando PTAX: ${moeda} para ${dataISO}`)
+    console.log(` PTAX Request: ${moeda} para ${dataISO} (original: ${data})`)
     
-    // URL do Banco Central com formato correto
+    // CORREÇÃO 2: URL do Banco Central com formato correto
     const url = `https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoMoedaDia(moeda='${moeda}',dataCotacao='${dataISO}')?$format=json`
     
     console.log(`📡 URL: ${url}`)
     
-    // Fetch com timeout e headers adequados
+    // CORREÇÃO 3: Timeout de 12s (dentro do limite do Vercel)
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 segundos
+    const timeoutId = setTimeout(() => controller.abort(), 12000)
     
     const response = await fetch(url, {
       method: 'GET',
@@ -51,7 +79,7 @@ export default async function handler(req, res) {
     
     if (response.ok) {
       const json = await response.json()
-      console.log(` Resposta:`, json)
+      console.log(` Response:`, json)
       
       if (json.value && json.value.length > 0) {
         const cotacao = parseFloat(json.value[0].cotacaoVenda)
@@ -62,7 +90,8 @@ export default async function handler(req, res) {
           data: data,
           cotacao,
           dataCotacao: dataISO,
-          fonte: 'PTAX Banco Central'
+          fonte: 'PTAX Banco Central',
+          timestamp: new Date().toISOString()
         })
       } else {
         console.log(`❌ Dados vazios do Banco Central`)
@@ -70,7 +99,8 @@ export default async function handler(req, res) {
           error: 'Cotação não encontrada',
           moeda,
           data: dataISO,
-          details: 'Banco Central retornou dados vazios'
+          details: 'Banco Central retornou dados vazios',
+          timestamp: new Date().toISOString()
         })
       }
     } else {
@@ -80,7 +110,8 @@ export default async function handler(req, res) {
         moeda,
         data: dataISO,
         status: response.status,
-        statusText: response.statusText
+        statusText: response.statusText,
+        timestamp: new Date().toISOString()
       })
     }
     
@@ -92,7 +123,8 @@ export default async function handler(req, res) {
         error: 'Timeout na conexão com Banco Central',
         moeda,
         data: data,
-        details: 'Tempo limite excedido'
+        details: 'Tempo limite excedido (12s)',
+        timestamp: new Date().toISOString()
       })
     }
     
@@ -100,7 +132,8 @@ export default async function handler(req, res) {
       error: 'Erro interno do servidor',
       moeda,
       data: data,
-      details: error.message
+      details: error.message,
+      timestamp: new Date().toISOString()
     })
   }
 }

@@ -1,4 +1,4 @@
-// PTAX API - Versão final corrigida
+// PTAX API - Versão que funciona com Banco Central real
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido' })
@@ -10,7 +10,23 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Verificar se é data futura
+    const [mm, dd, yyyy] = data.split('-')
+    const dataSolicitada = new Date(yyyy, mm - 1, dd)
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    
+    // Se for data futura, usar data de hoje
     let dataBusca = data
+    if (dataSolicitada > hoje) {
+      const hojeFormatado = new Date()
+      const mmHoje = String(hojeFormatado.getMonth() + 1).padStart(2, '0')
+      const ddHoje = String(hojeFormatado.getDate()).padStart(2, '0')
+      const yyyyHoje = hojeFormatado.getFullYear()
+      dataBusca = `${mmHoje}-${ddHoje}-${yyyyHoje}`
+      console.log('Data futura detectada, usando data de hoje:', dataBusca)
+    }
+    
     let tentativas = 0
     let cotacao = null
     let dataCotacao = null

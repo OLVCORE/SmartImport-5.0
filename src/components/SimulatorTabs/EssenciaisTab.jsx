@@ -116,8 +116,12 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   const [ptax, setPtax] = useState(data.ptax || '')
   // Adicionar estado para data da cotação
   const [ptaxDate, setPtaxDate] = useState(() => {
+    // Inicializar com data atual do sistema
     const now = new Date()
-    return now.toISOString().slice(0, 10) // yyyy-mm-dd
+    const yyyy = now.getFullYear()
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const dd = String(now.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
   })
   // Adicionar estado para fonte e data da cotação
   const [ptaxInfo, setPtaxInfo] = useState({ dataCotacao: '', fonte: '' })
@@ -1000,6 +1004,69 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     }
   }
 
+  // Função para verificar se data é futura
+  const isFutureDate = (dateString) => {
+    const selectedDate = new Date(dateString)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Reset para início do dia
+    return selectedDate > today
+  }
+
+  // Função para atualizar data automaticamente
+  const updateToCurrentDate = () => {
+    const now = new Date()
+    const yyyy = now.getFullYear()
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const dd = String(now.getDate()).padStart(2, '0')
+    const currentDate = `${yyyy}-${mm}-${dd}`
+    
+    setPtaxDate(currentDate)
+    
+    // Se estiver em modo automático, buscar PTAX automaticamente
+    if (ptaxMode === 'auto' && data.moeda) {
+      buscarCotacaoComData(currentDate)
+    }
+  }
+
+  // Função para buscar PTAX com data específica
+  const buscarCotacaoComData = async (dataEspecifica) => {
+    if (!data.moeda || !dataEspecifica) return
+    
+    setLoadingPtax(true)
+    
+    try {
+      const [yyyy, mm, dd] = dataEspecifica.split('-')
+      const dataParam = `${mm}-${dd}-${yyyy}`
+      const { cotacao, dataCotacao, fonte } = await fetchPTAXRate(data.moeda, dataParam)
+      setPtax(cotacao)
+      setPtaxInfo({ dataCotacao, fonte })
+      setPtaxEditable(false)
+      onChange({ ...data, ptax: cotacao })
+    } catch (err) {
+      setPtax('')
+      setPtaxInfo({ dataCotacao: '', fonte: '' })
+      console.error('Erro ao buscar PTAX:', err)
+    } finally {
+      setLoadingPtax(false)
+    }
+  }
+
+  // Função para lidar com mudança de data
+  const handleDateChange = (newDate) => {
+    setPtaxDate(newDate)
+    
+    // Se for data futura, forçar modo manual
+    if (isFutureDate(newDate)) {
+      setPtaxMode('manual')
+      setPtaxManualValue('')
+      setPtax('')
+      setPtaxInfo({ dataCotacao: '', fonte: '' })
+    } else if (ptaxMode === 'auto' && data.moeda) {
+      // Se for data passada/atual e modo automático, buscar PTAX
+      buscarCotacaoComData(newDate)
+    }
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 max-w-7xl mx-auto space-y-8">
       <h2 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white flex items-center">
@@ -1185,70 +1252,127 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
                   </svg>
                   Cotações PTAX - Banco Central
                 </h4>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="date"
-                    className="px-3 py-1 border border-blue-300 dark:border-blue-600 rounded text-xs bg-white dark:bg-slate-700 text-blue-900 dark:text-white"
-                    value={ptaxDate}
-                    onChange={e => setPtaxDate(e.target.value)}
-                    max={new Date().toISOString().slice(0, 10)}
-                  />
-                  <button
-                    type="button"
-                    onClick={buscarCotacao}
-                    className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-                    title="Atualizar cotações"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
-                </div>
               </div>
-              
-              {/* Adicionar antes do PTAXPanel existente */}
+
+              {/* Seção de Data com Detecção Automática */}
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {ptaxMode === 'auto' ? 'Busca automática do Banco Central' : 'Modo manual ativo'}
-                </span>
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {ptaxMode === 'auto' ? 'Busca automática do Banco Central' : 'Modo manual ativo'}
+                  </span>
+                  
+                  {/* Indicador de data atual */}
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-xs text-gray-500">
+                      {ptaxDate === new Date().toISOString().slice(0, 10) ? 'Hoje' : 'Data selecionada'}
+                    </span>
+                  </div>
+                </div>
                 
                 <div className="flex items-center space-x-3">
+                  {/* Botão para data atual */}
+                  <button
+                    onClick={updateToCurrentDate}
+                    disabled={loadingPtax}
+                    className="px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 flex items-center space-x-1 text-sm"
+                    title="Atualizar para data atual"
+                  >
+                    <svg className={`w-3 h-3 ${loadingPtax ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Hoje</span>
+                  </button>
+                  
+                  {/* Toggle PTAX Mode */}
                   <button
                     onClick={togglePtaxMode}
+                    disabled={isFutureDate(ptaxDate)}
                     className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                       ptaxMode === 'auto' 
                         ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
                         : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                    }`}
-                    title={ptaxMode === 'auto' ? 'Alternar para modo manual' : 'Alternar para modo automático'}
+                    } ${isFutureDate(ptaxDate) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={isFutureDate(ptaxDate) ? 'Datas futuras são sempre manuais' : (ptaxMode === 'auto' ? 'Alternar para modo manual' : 'Alternar para modo automático')}
                   >
-                    {ptaxMode === 'auto' ? ' Manual' : '🤖 Auto'}
+                    {ptaxMode === 'auto' ? '✏️ Manual' : '🤖 Auto'}
                   </button>
                   
-                  {ptaxMode === 'auto' && (
+                  {/* Atualizar (apenas modo automático) */}
+                  {ptaxMode === 'auto' && !isFutureDate(ptaxDate) && (
                     <button
-                      onClick={buscarCotacao}
+                      onClick={() => buscarCotacaoComData(ptaxDate)}
                       disabled={loadingPtax}
                       className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-1"
                     >
-                      <RefreshCw className={`w-3 h-3 ${loadingPtax ? 'animate-spin' : ''}`} />
+                      <svg className={`w-3 h-3 ${loadingPtax ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
                       <span>Atualizar</span>
                     </button>
                   )}
                 </div>
               </div>
-              
-              {/* Adicionar campo manual quando em modo manual */}
-              {ptaxMode === 'manual' && (
+
+              {/* Seletor de Data */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Data do PTAX
+                </label>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="date"
+                    value={ptaxDate}
+                    onChange={e => handleDateChange(e.target.value)}
+                    max={new Date().toISOString().slice(0, 10)} // Máximo: hoje
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  />
+                  
+                  {/* Indicador visual de tipo de data */}
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    isFutureDate(ptaxDate) 
+                      ? 'bg-red-100 text-red-700' 
+                      : ptaxDate === new Date().toISOString().slice(0, 10)
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {isFutureDate(ptaxDate) ? 'Futura' : ptaxDate === new Date().toISOString().slice(0, 10) ? 'Hoje' : 'Passada'}
+                  </div>
+                </div>
+                
+                {/* Aviso para datas futuras */}
+                {isFutureDate(ptaxDate) && (
+                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className="flex items-center">
+                      <svg className="h-4 w-4 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <span className="text-xs text-red-700 dark:text-red-300">
+                        Data futura detectada. Modo manual ativado automaticamente.
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Campo manual (apenas para datas futuras ou modo manual) */}
+              {(ptaxMode === 'manual' || isFutureDate(ptaxDate)) && (
                 <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                   <div className="flex items-start mb-3">
-                    <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" />
+                    <svg className="h-4 w-4 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
                     <div>
                       <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                        Modo Manual Ativo
+                        {isFutureDate(ptaxDate) ? 'Data Futura - Modo Manual Obrigatório' : 'Modo Manual Ativo'}
                       </h4>
                       <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                        Insira o valor do PTAX manualmente para simulações futuras.
+                        {isFutureDate(ptaxDate) 
+                          ? 'Para datas futuras, insira o PTAX projetado manualmente.' 
+                          : 'Insira o valor do PTAX manualmente para simulações.'
+                        }
                       </p>
                     </div>
                   </div>
@@ -1272,39 +1396,13 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
                   </div>
                 </div>
               )}
-              
-              {/* Painel PTAX Compacto */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg border border-blue-200 dark:border-blue-700 p-3 max-h-48 overflow-y-auto">
-                <PTAXPanel
-                  selectedDate={ptaxDate}
-                  onCurrencySelect={handleCurrencySelect}
-                  selectedCurrency={data.moeda}
-                />
-              </div>
-              
-              {/* Cotação Selecionada */}
-              {data.moeda && data.ptax && (
-                <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-sm font-medium text-green-800 dark:text-green-200">
-                        {data.moeda} Selecionada
-                      </span>
-                      <span className="text-xs text-green-600 dark:text-green-400">
-                        PTAX: R$ {parseFloat(data.ptax).toFixed(4)}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setPtaxEditable(true)}
-                      className="text-xs text-blue-600 hover:text-blue-800 dark:hover:text-blue-400 transition-colors"
-                      title="Editar cotação manualmente"
-                    >
-                      ✏️ Editar
-                    </button>
-                  </div>
-                </div>
-              )}
+
+              {/* PTAXPanel existente */}
+              <PTAXPanel
+                selectedDate={ptaxDate}
+                onCurrencySelect={handleCurrencySelect}
+                selectedCurrency={data.moeda}
+              />
             </div>
           </div>
 

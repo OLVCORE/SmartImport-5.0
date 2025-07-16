@@ -1,3 +1,4 @@
+// Serviço para buscar cotação PTAX do Banco Central
 // Serviço para buscar cotação PTAX do Banco Central via backend (NUNCA direto do browser)
 export async function getPtaxRate(moeda = 'USD', data) {
   if (!moeda || !data) return { cotacao: null, dataCotacao: null, fonte: 'PTAX Banco Central' }
@@ -22,5 +23,37 @@ export async function getPtaxRate(moeda = 'USD', data) {
     dataBusca = `${mmAnterior}-${ddAnterior}-${yyyyAnterior}`
     tentativas++
   }
+  return { cotacao, dataCotacao, fonte: 'PTAX Banco Central' }
+} 
+          'Accept': 'application/json'
+        }
+      })
+      
+      clearTimeout(timeoutId)
+      
+      if (response.ok) {
+        const json = await response.json()
+        
+        if (json.value && json.value.length > 0) {
+          cotacao = parseFloat(json.value[0].cotacaoVenda)
+          dataCotacao = dataISO
+          console.log('✅ PTAX encontrado:', cotacao, 'para', moeda)
+          break
+        }
+      }
+    } catch (error) {
+      console.error('Erro na tentativa', tentativas + 1, ':', error.message)
+    }
+    
+    // Tenta o dia anterior
+    const [mm, dd, yyyy] = dataBusca.split('-')
+    const dataAnterior = new Date(yyyy, mm - 1, dd - 1)
+    const mmAnterior = String(dataAnterior.getMonth() + 1).padStart(2, '0')
+    const ddAnterior = String(dataAnterior.getDate()).padStart(2, '0')
+    const yyyyAnterior = dataAnterior.getFullYear()
+    dataBusca = `${mmAnterior}-${ddAnterior}-${yyyyAnterior}`
+    tentativas++
+  }
+  
   return { cotacao, dataCotacao, fonte: 'PTAX Banco Central' }
 } 

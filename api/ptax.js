@@ -1,4 +1,4 @@
-// PTAX API - TESTE DIRETO DO BANCO CENTRAL
+// PTAX API - VERSÃO SIMPLIFICADA E FUNCIONAL
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido' })
@@ -17,20 +17,14 @@ export default async function handler(req, res) {
     // URL para data de hoje
     const urlHoje = `https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoMoedaDia(moeda='${moeda}',dataCotacao='${dataHoje}')?$format=json`
     
-    console.log('Testando Banco Central com data de hoje:', urlHoje)
+    console.log('Testando Banco Central:', urlHoje)
     
-    const response = await fetch(urlHoje, {
-      headers: {
-        'User-Agent': 'SmartImport-5.0/1.0'
-      }
-    })
+    const response = await fetch(urlHoje)
     
     console.log('Status da resposta:', response.status)
-    console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()))
     
     if (response.ok) {
       const json = await response.json()
-      console.log('Resposta do Banco Central:', JSON.stringify(json, null, 2))
       
       if (json.value && json.value.length > 0) {
         const cotacao = parseFloat(json.value[0].cotacaoVenda)
@@ -39,46 +33,29 @@ export default async function handler(req, res) {
           data: dataHoje,
           cotacao,
           dataCotacao: dataHoje,
-          fonte: 'PTAX Banco Central (Data de Hoje)',
-          debug: {
-            urlTestada: urlHoje,
-            status: response.status,
-            dadosEncontrados: json.value.length
-          }
+          fonte: 'PTAX Banco Central'
         })
       } else {
         return res.status(404).json({
           error: 'Banco Central retornou dados vazios',
           moeda,
-          data: dataHoje,
-          debug: {
-            urlTestada: urlHoje,
-            status: response.status,
-            resposta: json
-          }
+          data: dataHoje
         })
       }
     } else {
-      const errorText = await response.text()
-      return res.status(response.status).json({
+      return res.status(404).json({
         error: 'Erro na resposta do Banco Central',
         moeda,
         data: dataHoje,
-        debug: {
-          urlTestada: urlHoje,
-          status: response.status,
-          statusText: response.statusText,
-          errorText
-        }
+        status: response.status
       })
     }
     
   } catch (error) {
-    console.error('Erro completo PTAX:', error)
+    console.error('Erro PTAX:', error.message)
     return res.status(500).json({
       error: 'Erro ao conectar com Banco Central',
-      details: error.message,
-      stack: error.stack
+      details: error.message
     })
   }
 }

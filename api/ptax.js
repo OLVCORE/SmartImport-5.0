@@ -1,6 +1,4 @@
-// PTAX API - Versão funcional do Vercel (baseada no server.js)
-// Esta versão funcionava perfeitamente no Vercel
-
+// PTAX API - Versão simplificada e funcional para Vercel
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido' })
@@ -12,13 +10,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Usar a mesma lógica do server.js que funcionava
     let dataBusca = data
     let tentativas = 0
     let cotacao = null
     let dataCotacao = null
     
-    console.log(` Buscando PTAX para ${moeda} na data ${dataBusca}`)
+    console.log('Buscando PTAX para', moeda, 'na data', dataBusca)
     
     while (tentativas < 7) {
       // Formato esperado pelo Bacen: AAAA-MM-DD
@@ -28,27 +25,27 @@ export default async function handler(req, res) {
       const url = `https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoMoedaDia(moeda='${moeda}',dataCotacao='${dataISO}')?$format=json`
       
       try {
-        console.log(`📡 Tentativa ${tentativas + 1}: ${url}`)
+        console.log('Tentativa', tentativas + 1, ':', url)
         const response = await fetch(url)
         
         if (!response.ok) {
-          console.warn(`⚠️ Resposta não OK: ${response.status}`)
+          console.warn('Resposta não OK:', response.status)
           throw new Error(`HTTP ${response.status}`)
         }
         
         const json = await response.json()
-        console.log(`📊 Resposta PTAX:`, json)
+        console.log('Resposta PTAX:', json)
         
         if (json.value && json.value.length > 0) {
           cotacao = parseFloat(json.value[0].cotacaoVenda)
           dataCotacao = dataISO
-          console.log(`✅ PTAX encontrado: ${cotacao} para ${moeda}`)
+          console.log('PTAX encontrado:', cotacao, 'para', moeda)
           break
         } else {
-          console.log(`⚠️ Nenhum valor encontrado para ${moeda} em ${dataISO}`)
+          console.log('Nenhum valor encontrado para', moeda, 'em', dataISO)
         }
       } catch (error) {
-        console.error(`❌ Erro na tentativa ${tentativas + 1}:`, error.message)
+        console.error('Erro na tentativa', tentativas + 1, ':', error.message)
       }
       
       // Tenta o dia anterior
@@ -62,7 +59,7 @@ export default async function handler(req, res) {
     }
     
     if (cotacao === null) {
-      console.warn(`⚠️ PTAX não encontrado após ${tentativas} tentativas`)
+      console.warn('PTAX não encontrado após', tentativas, 'tentativas')
       return res.status(404).json({ 
         error: 'Cotação não encontrada',
         moeda,
@@ -71,7 +68,7 @@ export default async function handler(req, res) {
       })
     }
     
-    console.log(`✅ PTAX retornado:`, { moeda, data, cotacao, dataCotacao })
+    console.log('PTAX retornado:', { moeda, data, cotacao, dataCotacao })
     return res.status(200).json({ 
       moeda, 
       data, 
@@ -81,7 +78,7 @@ export default async function handler(req, res) {
     })
     
   } catch (error) {
-    console.error(`❌ Erro na rota PTAX:`, error)
+    console.error('Erro na rota PTAX:', error)
     return res.status(500).json({ 
       error: 'Erro interno do servidor',
       message: error.message 

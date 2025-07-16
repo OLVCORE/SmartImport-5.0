@@ -131,6 +131,9 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   const [ptaxMode, setPtaxMode] = useState('auto')
   const [ptaxManualValue, setPtaxManualValue] = useState('')
 
+  // Adicionar a variável que estava faltando
+  const [loadingPtax, setLoadingPtax] = useState(false)
+
   // Função para alternar modo PTAX
   const togglePtaxMode = () => {
     const newMode = ptaxMode === 'auto' ? 'manual' : 'auto'
@@ -938,19 +941,24 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   // Função para buscar cotação PTAX
   const buscarCotacao = async () => {
     if (!data.moeda || !ptaxDate) return
-    const [yyyy, mm, dd] = ptaxDate.split('-')
-    const dataParam = `${mm}-${dd}-${yyyy}`
+    
+    setLoadingPtax(true)
+    
     try {
+      const [yyyy, mm, dd] = ptaxDate.split('-')
+      const dataParam = `${mm}-${dd}-${yyyy}`
       const { cotacao, dataCotacao, fonte } = await fetchPTAXRate(data.moeda, dataParam)
       setPtax(cotacao)
       setPtaxInfo({ dataCotacao, fonte })
-      setPtaxEditable(false) // Torna read-only após buscar
+      setPtaxEditable(false)
       onChange({ ...data, ptax: cotacao })
     } catch (err) {
       setPtax('')
       setPtaxInfo({ dataCotacao: '', fonte: '' })
       alert('Erro ao buscar PTAX do Banco Central. Verifique sua conexão ou tente novamente mais tarde.')
       console.error('Erro ao buscar PTAX:', err)
+    } finally {
+      setLoadingPtax(false)
     }
   }
 

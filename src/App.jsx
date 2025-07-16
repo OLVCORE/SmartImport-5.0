@@ -1,7 +1,9 @@
 import React, { Suspense, useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, BrowserRouter as Router } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
+import { ErrorBoundary } from 'react-error-boundary'
+import ErrorFallback from './components/ErrorFallback'
 
 // Layout Components
 import Layout from './components/Layout/Layout'
@@ -15,6 +17,9 @@ import Reports from './pages/Reports'
 import Integrations from './pages/Integrations'
 import Settings from './pages/Settings'
 import Help from './pages/Help'
+import SmartFrete from './pages/SmartFrete'
+import SeaFrete from './pages/SeaFrete'
+import OPNIA from './pages/OPNIA'
 
 // Hooks
 import { useSERPStore } from './store/serpStore'
@@ -29,7 +34,7 @@ function AppContent() {
     
     console.log('🎯 SERP System initialized with theme:', theme)
     console.log('🎯 App routes configured:', [
-      '/', '/dashboard', '/simulator', '/history', '/reports', '/integrations', '/settings', '/help'
+      '/', '/dashboard', '/simulator', '/history', '/reports', '/integrations', '/opnia', '/settings', '/help', '/smartfrete', '/seafrete'
     ])
   }, [theme, initializeSERP])
 
@@ -49,8 +54,11 @@ function AppContent() {
               <Route path="history" element={<History />} />
               <Route path="reports" element={<Reports />} />
               <Route path="integrations" element={<Integrations />} />
+              <Route path="opnia" element={<OPNIA />} />
               <Route path="settings" element={<Settings />} />
               <Route path="help" element={<Help />} />
+              <Route path="smartfrete" element={<SmartFrete />} />
+              <Route path="seafrete" element={<SeaFrete />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Route>
           </Routes>
@@ -62,9 +70,13 @@ function AppContent() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <Router>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
+      </Router>
+    </ErrorBoundary>
   )
 }
 

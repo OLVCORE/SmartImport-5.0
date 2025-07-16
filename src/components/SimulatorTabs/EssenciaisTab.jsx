@@ -125,6 +125,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   const [ptaxManual, setPtaxManual] = useState(false)
   const [ptaxEditable, setPtaxEditable] = useState(false)
   const [showPTAXPanel, setShowPTAXPanel] = useState(false)
+  const [ptaxData, setPtaxData] = useState({})
 
   // NOVO: Resetar estados ao montar/desmontar
   useEffect(() => {
@@ -145,9 +146,9 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     await processarDocumentoReal(uploadFile)
   }
 
-  // Filtrar zonas aduaneiras por UF e modal
+  // Filtrar zonas aduaneiras por UF e modal - CORRIGIDO
   const zonasFiltradas = aduanas.filter(a =>
-    (!uf || a.uf === uf) &&
+    (!data.ufDesembaraco || a.uf === data.ufDesembaraco) &&
     (!data.modal || (data.modal === 'maritimo' && a.tipo === 'porto') ||
      (data.modal === 'aereo' && a.tipo === 'aeroporto') ||
      (data.modal === 'rodoviario' && (a.tipo === 'fronteira' || a.tipo === 'ead')) ||
@@ -158,6 +159,10 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
       a.codigo.toLowerCase().includes(buscaZona.toLowerCase())
     ))
   )
+
+  // Separar zonas primárias e EADIs
+  const zonasPrimarias = zonasFiltradas.filter(z => ['porto', 'aeroporto', 'fronteira'].includes(z.tipo))
+  const zonasEADI = zonasFiltradas.filter(z => z.tipo === 'ead')
 
   // Filtrar países para autocomplete
   const paisesFiltrados = paises.filter(p =>
@@ -172,6 +177,21 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     data.valorFob && parseFloat(data.valorFob) > 0 &&
     data.frete !== undefined && data.seguro !== undefined &&
     ptax && parseFloat(ptax) > 0
+
+  // Objeto de status de validação para cada campo
+  const validationStatus = {
+    'País de Origem': !!data.paisOrigem,
+    'UF Desembaraço': !!data.ufDesembaraco,
+    'UF Destino': !!data.ufDestino,
+    'Modal': !!data.modal,
+    'Moeda': !!data.moeda,
+    'Zona Aduaneira': !!data.zonaAduaneira,
+    'Produtos': produtos.length > 0 && produtos.every(p => p.descricao && p.descricao.trim() !== '' && p.ncm && /^\d{8}$/.test(p.ncm)),
+    'Valor FOB': !!(data.valorFob && parseFloat(data.valorFob) > 0),
+    'Frete': data.frete !== undefined,
+    'Seguro': data.seguro !== undefined,
+    'PTAX': !!(ptax && parseFloat(ptax) > 0)
+  }
 
   // Debug para validação
   const debugValidation = () => {
@@ -327,7 +347,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
 
   // Limitar processamento inicial a 10 páginas ou 20.000 caracteres na extração de texto do PDF
   const processarDocumentoReal = async (file) => {
-    if (!iaInvoked) return; // Só processa IA após ação do usuário
+    // Remover condição que bloqueava processamento automático
     setProcessingDocument(true);
     setProcessamentoResumo(null);
     setLargeDocAlert(false);
@@ -371,7 +391,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
           
           toast.success(`${novosProdutos.length} produtos extraídos localmente. Documento grande processado sem custo de IA.`);
         } else {
-          if (iaInvoked) toast.error('Nenhum produto encontrado no documento');
+          toast.error('Nenhum produto encontrado no documento');
         }
         
         return;
@@ -443,96 +463,94 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
         
         toast.success(`${novosProdutos.length} produtos adicionados. ${methodMessages[resultado.method] || ''}`);
       } else {
-        if (iaInvoked) toast.error('Nenhum produto encontrado no documento');
+        toast.error('Nenhum produto encontrado no documento');
       }
       
     } catch (error) {
       console.error('Erro ao processar documento:', error);
       
       if (error.message.includes('Limite de uso atingido')) {
-        if (iaInvoked) toast.error('Limite de uso de IA atingido. Faça upgrade para continuar.');
+        toast.error('Limite de uso de IA atingido. Faça upgrade para continuar.');
         setLimiteAtingido(true);
       } else if (error.message.includes('429') || error.message.includes('rate limit')) {
-        if (iaInvoked) {
-          toast.error('Limite de requisições da IA atingido. Usando processamento local como fallback...');
+        toast.error('Limite de requisições da IA atingido. Usando processamento local como fallback...');
+        
+        // FALLBACK: Usar processamento local quando IA falha
+        try {
+          setProgressState(prev => ({
+            ...prev,
+            stage: 'analyzing',
+            message: 'IA indisponível. Processando localmente...'
+          }));
           
-          // FALLBACK: Usar processamento local quando IA falha
-          try {
-            setProgressState(prev => ({
-              ...prev,
-              stage: 'analyzing',
-              message: 'IA indisponível. Processando localmente...'
-            }));
-            
-            // Extrair produtos localmente do texto do documento
-            let textoParaAnalise = documentText;
-            if (!textoParaAnalise && uploadFile) {
-              // Se não temos texto extraído, tentar extrair novamente
-              try {
-                const arrayBuffer = await uploadFile.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                let fullText = '';
-                let pageLimit = Math.min(pdf.numPages, 5); // Limitar a 5 páginas para fallback
-                
-                for (let i = 1; i <= pageLimit; i++) {
-                  const page = await pdf.getPage(i);
-                  const textContent = await page.getTextContent();
-                  const pageText = textContent.items.map(item => item.str).join(' ');
-                  fullText += pageText + '\n';
-                }
-                textoParaAnalise = fullText;
-              } catch (extractError) {
-                console.error('Erro ao extrair texto para fallback:', extractError);
-                textoParaAnalise = 'Documento carregado - análise local ativada';
+          // Extrair produtos localmente do texto do documento
+          let textoParaAnalise = documentText;
+          if (!textoParaAnalise && uploadFile) {
+            // Se não temos texto extraído, tentar extrair novamente
+            try {
+              const arrayBuffer = await uploadFile.arrayBuffer();
+              const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+              let fullText = '';
+              let pageLimit = Math.min(pdf.numPages, 5); // Limitar a 5 páginas para fallback
+              
+              for (let i = 1; i <= pageLimit; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
               }
+              textoParaAnalise = fullText;
+            } catch (extractError) {
+              console.error('Erro ao extrair texto para fallback:', extractError);
+              textoParaAnalise = 'Documento carregado - análise local ativada';
             }
-            
-            // Extrair produtos usando método local robusto
-            const produtosLocais = aiService.extractProductsLocal(textoParaAnalise);
-            
-            // Se não encontrou produtos, criar um produto genérico
-            let novosProdutos = [];
-            if (produtosLocais.length > 0) {
-              novosProdutos = produtosLocais.map((produto, index) => ({
-                id: Date.now() + index,
-                descricao: produto.descricao || 'Produto extraído do documento',
-                ncm: produto.ncm || '',
-                quantidade: produto.quantidade || 1,
-                valorUnitario: produto.valorUnitario || 0,
-                especificacoes: produto.especificacoes || {},
-                observacoes: produto.observacoes || '',
-                origem: 'extração local (IA indisponível)'
-              }));
-            } else {
-              // Criar produto genérico se não encontrou nada
-              novosProdutos = [{
-                id: Date.now(),
-                descricao: `Produto do documento: ${uploadFile.name}`,
-                ncm: '',
-                quantidade: 1,
-                valorUnitario: 0,
-                especificacoes: {},
-                observacoes: 'Produto extraído via processamento local (IA indisponível)',
-                origem: 'extração local (IA indisponível)'
-              }];
-            }
-            
-            if (novosProdutos.length > 0) {
-              setProdutos(prev => [...prev, ...novosProdutos]);
-              onChange({ ...data, produtos: [...produtos, ...novosProdutos] });
-              toast.success(`${novosProdutos.length} produtos extraídos localmente. IA indisponível, mas processamento local funcionou.`);
-            } else {
-              toast.error('Nenhum produto encontrado. Tente novamente em alguns minutos.');
-            }
-          } catch (fallbackError) {
-            console.error('Erro no fallback local:', fallbackError);
-            toast.error('Erro no processamento. Tente novamente em alguns minutos.');
           }
+          
+          // Extrair produtos usando método local robusto
+          const produtosLocais = aiService.extractProductsLocal(textoParaAnalise);
+          
+          // Se não encontrou produtos, criar um produto genérico
+          let novosProdutos = [];
+          if (produtosLocais.length > 0) {
+            novosProdutos = produtosLocais.map((produto, index) => ({
+              id: Date.now() + index,
+              descricao: produto.descricao || 'Produto extraído do documento',
+              ncm: produto.ncm || '',
+              quantidade: produto.quantidade || 1,
+              valorUnitario: produto.valorUnitario || 0,
+              especificacoes: produto.especificacoes || {},
+              observacoes: produto.observacoes || '',
+              origem: 'extração local (IA indisponível)'
+            }));
+          } else {
+            // Criar produto genérico se não encontrou nada
+            novosProdutos = [{
+              id: Date.now(),
+              descricao: `Produto do documento: ${uploadFile.name}`,
+              ncm: '',
+              quantidade: 1,
+              valorUnitario: 0,
+              especificacoes: {},
+              observacoes: 'Produto extraído via processamento local (IA indisponível)',
+              origem: 'extração local (IA indisponível)'
+            }];
+          }
+          
+          if (novosProdutos.length > 0) {
+            setProdutos(prev => [...prev, ...novosProdutos]);
+            onChange({ ...data, produtos: [...produtos, ...novosProdutos] });
+            toast.success(`${novosProdutos.length} produtos extraídos localmente. IA indisponível, mas processamento local funcionou.`);
+          } else {
+            toast.error('Nenhum produto encontrado. Tente novamente em alguns minutos.');
+          }
+        } catch (fallbackError) {
+          console.error('Erro no fallback local:', fallbackError);
+          toast.error('Erro no processamento. Tente novamente em alguns minutos.');
         }
       } else {
-        if (iaInvoked) toast.error(`Erro ao processar documento: ${error.message}`);
+        toast.error('Erro ao processar documento. Tente novamente.');
       }
-    
+    } finally {
       setProcessingDocument(false);
       setProgressState({
         stage: 'idle',
@@ -545,11 +563,11 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     }
   };
 
-  // Sugestão real de NCM por IA
+  // Sugestão de NCM - CORRIGIDO (removida exigência de 50 caracteres)
   const handleNcmSuggest = async (produtoId) => {
     const produto = produtos.find(p => p.id === produtoId)
-    if (!produto || produto.descricao.length < 50) {
-      toast.error('Descrição deve ter pelo menos 50 caracteres para sugestão de NCM')
+    if (!produto) {
+      toast.error('Produto não encontrado')
       return
     }
 
@@ -633,22 +651,20 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'application/vnd.ms-excel': ['.xls'],
+      'application/msword': ['.doc', '.docx'],
       'text/plain': ['.txt'],
       'image/*': ['.jpg', '.jpeg', '.png', '.tiff', '.bmp']
     },
-    onDrop: (acceptedFiles) => {
+    onDrop: async (acceptedFiles) => {
       if (acceptedFiles.length > 0) {
         setUploadFile(acceptedFiles[0])
-        setLimiteAtingido(false); // Resetar limite ao novo upload
-        setIaInvoked(false); // Resetar flag de ação do usuário
-        setDocumentText('');
-        setProdutos([]);
-        setProcessamentoResumo(null);
-        setLargeDocAlert(false);
+        setLimiteAtingido(false)
+        setIaInvoked(true) // Ativar IA para processamento automático
+        setDocumentText('')
+        setProdutos([])
+        setProcessamentoResumo(null)
+        setLargeDocAlert(false)
         setProgressState({
           stage: 'idle',
           currentChunk: 0,
@@ -656,7 +672,9 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
           productsFound: 0,
           documentSize: 0,
           message: ''
-        });
+        })
+        // Pipeline IA automático após upload
+        await processarDocumentoReal(acceptedFiles[0])
       }
     }
   })
@@ -862,8 +880,6 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   };
 
   // Agrupar aduanas por tipo para exibição separada
-  const zonasPrimarias = zonasFiltradas.filter(z => ['porto', 'aeroporto', 'fronteira'].includes(z.tipo))
-  const zonasEADI = zonasFiltradas.filter(z => z.tipo === 'ead')
 
   // Mapeamento de elegibilidade de modais por país
   const getModaisElegiveis = (paisOrigem) => {
@@ -949,378 +965,349 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 max-w-6xl mx-auto">
-      <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-white">Dados Essenciais</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 max-w-7xl mx-auto space-y-8">
+      <h2 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white flex items-center">
+        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mr-3">
+          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        Dados Essenciais
+      </h2>
       
-      {/* Alerta sobre NCMs */}
-      <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+      {/* Alerta sobre NCMs - Melhorado */}
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-l-4 border-amber-400 dark:border-amber-500 p-6 rounded-lg">
         <div className="flex items-start">
-          <div className="flex-shrink-0">
-            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-              Atenção: Classificação de NCMs
+          <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 mt-0.5 mr-4 flex-shrink-0" />
+          <div>
+            <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
+              Atenção: Classificação NCM e LI/LP
             </h3>
-            <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-              <p>Os NCMs sugeridos são apenas orientações. A classificação final deve ser validada por um despachante aduaneiro habilitado. Em caso de dúvida, consulte sempre um profissional especializado.</p>
-            </div>
+            <p className="text-amber-700 dark:text-amber-300 leading-relaxed">
+              A classificação correta do NCM é fundamental para o cálculo preciso dos tributos. 
+              Recomendamos sempre validar com um despachante aduaneiro habilitado.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Alerta de limite atingido */}
-      {limiteAtingido && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <div className="flex items-start">
-            <AlertTriangle className="h-5 w-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
-            <div className="flex-1">
-              <h3 className="text-sm font-medium text-red-800">
-                Limite de uso de IA atingido
-              </h3>
-              <p className="text-sm text-red-700 mt-1">
-                Você atingiu o limite de tokens para este mês. Faça upgrade para continuar usando a IA.
-              </p>
-              <div className="mt-3 flex space-x-3">
-                <button
-                  type="button"
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                  onClick={() => {
-                    // TODO: Implementar upgrade de plano
-                    toast.info('Funcionalidade de upgrade em desenvolvimento');
-                  }}
-                >
-                  Fazer Upgrade
-                </button>
-                <button
-                  type="button"
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium"
-                  onClick={() => setLimiteAtingido(false)}
-                >
-                  Continuar sem IA
-                </button>
+      {/* Grid Principal - Melhorado */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Coluna 1: Dados Básicos */}
+        <div className="space-y-6">
+          {/* Dados Essenciais - Card Elegante */}
+          <div className="bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-800 dark:to-blue-900/20 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center">
+              <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Alerta de documento grande */}
-      {largeDocAlert && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <div className="flex items-start">
-            <div className="flex-1">
-              <h3 className="text-sm font-medium text-blue-800">
-                📄 Documento Grande Detectado
-              </h3>
-              <p className="text-sm text-blue-700 mt-1">
-                Este documento será processado localmente, sem custo de IA. A extração será feita usando filtros específicos para o tipo de documento identificado.
-              </p>
-              <div className="mt-2 text-xs text-blue-600">
-                <p>✅ Sem limite de tamanho</p>
-                <p>✅ Processamento local gratuito</p>
-                <p>✅ IA usada apenas para classificação NCM</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {iaInvoked && renderUsageInfo()}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Coluna 1 */}
-        <div className="space-y-4">
-          {/* País de Origem com Autocomplete */}
-          <div className="relative">
-            <Tooltip content="País de onde a mercadoria será embarcada e exportada para o Brasil">
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center">
-                <svg className="w-4 h-4 mr-2 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                País de Origem
-              </label>
-            </Tooltip>
-            <input 
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 h-11 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={buscaPais}
-              onChange={e => {
-                setBuscaPais(e.target.value)
-                setShowPaisDropdown(true)
-                if (!e.target.value) {
-                  onChange({ ...data, paisOrigem: '' })
-                }
-              }}
-              onFocus={() => setShowPaisDropdown(true)}
-              placeholder="Digite o nome ou sigla do país..."
-            />
-            {showPaisDropdown && buscaPais && (
-              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                {paisesFiltrados.map(pais => (
-                  <button
-                    key={pais.codigo}
-                    className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                    onClick={() => {
-                      setBuscaPais(`${pais.nome} (${pais.sigla})`)
-                      onChange({ ...data, paisOrigem: pais.nome })
-                      setShowPaisDropdown(false)
-                    }}
-                  >
-                    <span className="font-medium">{pais.nome}</span>
-                    <span className="ml-2 text-gray-500">({pais.sigla})</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* UF de Desembaraço */}
-          <div>
-            <Tooltip content="Estado brasileiro onde será realizado o desembaraço aduaneiro da mercadoria">
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center">
-                <svg className="w-4 h-4 mr-2 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                UF de Desembaraço
-              </label>
-            </Tooltip>
-            <select 
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 h-11 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={data.ufDesembaraco || ''} 
-              onChange={e => { 
-                setUf(e.target.value)
-                onChange({ ...data, ufDesembaraco: e.target.value }) 
-              }}
-            >
-              <option value="">Selecione a UF</option>
-              {estados.map(estado => (
-                <option key={estado.sigla} value={estado.sigla}>
-                  {estado.sigla} ({estado.nome})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* UF de Destino */}
-          <div>
-            <Tooltip content="Estado brasileiro de destino final da mercadoria após o desembaraço">
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center">
-                <svg className="w-4 h-4 mr-2 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                UF de Destino Final
-              </label>
-            </Tooltip>
-            <select 
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 h-11 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={data.ufDestino || ''} 
-              onChange={e => { 
-                setUfDestino(e.target.value)
-                onChange({ ...data, ufDestino: e.target.value }) 
-              }}
-            >
-              <option value="">Selecione a UF</option>
-              {estados.map(estado => (
-                <option key={estado.sigla} value={estado.sigla}>
-                  {estado.sigla} ({estado.nome})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Modal */}
-          <div>
-            <Tooltip content="Modal de transporte predominante utilizado na importação">
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center">
-                <svg className="w-4 h-4 mr-2 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                </svg>
-                Modal Principal
-              </label>
-            </Tooltip>
-            <select
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={data.modal || ''}
-              onChange={e => onChange({ ...data, modal: e.target.value })}
-            >
-              <option value="">Selecione o modal...</option>
-              {getModaisElegiveis(data.paisOrigem).map(m => (
-                <option key={m.value} value={m.value} disabled={m.disabled} style={m.disabled ? { color: '#bbb', background: '#f3f4f6' } : {}}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Moeda */}
-          <div>
-            <Tooltip content="Moeda principal utilizada na negociação da importação">
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center">
-                <svg className="w-4 h-4 mr-2 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
-                Moeda
-              </label>
-            </Tooltip>
-            <select 
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 h-11 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={data.moeda || ''} 
-              onChange={e => onChange({ ...data, moeda: e.target.value })}
-            >
-              <option value="">Selecione</option>
-              {moedas.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-            {/* Bloco de PTAX logo abaixo da seleção de moeda */}
-            <div className="mt-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded flex flex-col md:flex-row gap-4 items-center">
-              <div className="flex flex-col mt-2 w-full">
-                <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Cotação PTAX</label>
-                <div className="flex items-center gap-2">
+              Informações Básicas
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* País de Origem */}
+              <div className="space-y-2">
+                <Tooltip content="País de origem da mercadoria">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    País de Origem
+                  </label>
+                </Tooltip>
+                <div className="relative">
                   <input
-                    type="number"
-                    step="0.0001"
-                    min="0.0001"
-                    className="w-full px-3 py-2 border border-blue-300 dark:border-blue-600 rounded-md bg-white dark:bg-gray-700 text-blue-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={ptax}
+                    type="text"
+                    className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="Digite o nome ou sigla do país..."
+                    value={buscaPais || data.paisOrigem || ''}
                     onChange={e => {
-                      setPtax(e.target.value)
-                      onChange({ ...data, ptax: e.target.value })
+                      setBuscaPais(e.target.value)
+                      setShowPaisDropdown(true)
+                      if (!e.target.value) {
+                        onChange({ ...data, paisOrigem: '' })
+                      }
                     }}
-                    placeholder="Ex: 5.15"
-                    required
-                    readOnly={!ptaxEditable}
+                    onFocus={() => setShowPaisDropdown(true)}
                   />
-                  <button
-                    type="button"
-                    className="ml-2 px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-700 text-xs"
-                    onClick={() => setPtaxEditable(true)}
-                    title="Permitir edição manual da cotação PTAX"
-                    disabled={ptaxEditable}
-                  >Editar</button>
-                </div>
-                <span className="text-xs text-blue-500">
-                  (PTAX do Banco Central - {ptaxEditable ? 'editável' : 'automática'})
-                  {ptaxInfo.dataCotacao && (
-                    <> | Fonte: {ptaxInfo.fonte} | Data: {ptaxInfo.dataCotacao.split('-').reverse().join('/')}</>
+                  {showPaisDropdown && buscaPais && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {paisesFiltrados.map(pais => (
+                        <button
+                          key={pais.codigo}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                          onClick={() => {
+                            setBuscaPais(`${pais.nome} (${pais.sigla})`)
+                            onChange({ ...data, paisOrigem: pais.nome })
+                            setShowPaisDropdown(false)
+                          }}
+                        >
+                          <span className="font-medium">{pais.nome}</span>
+                          <span className="ml-2 text-gray-500">({pais.sigla})</span>
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </span>
+                </div>
               </div>
-              {/* Campo de seleção de data e botão buscar cotação */}
-              <div className="flex flex-col md:flex-row md:items-end items-stretch gap-2 mt-2 w-full">
-                <div className="flex-1 min-w-[140px]">
-                  <label className="block text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Data da cotação:</label>
+
+              {/* UF de Desembaraço */}
+              <div className="space-y-2">
+                <Tooltip content="Estado onde será realizado o desembaraço aduaneiro">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    UF de Desembaraço
+                  </label>
+                </Tooltip>
+                <select
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  value={data.ufDesembaraco || ''}
+                  onChange={e => onChange({ ...data, ufDesembaraco: e.target.value })}
+                >
+                  <option value="">Selecione a UF</option>
+                  {estados.map(estado => <option key={estado.sigla} value={estado.sigla}>{estado.nome}</option>)}
+                </select>
+              </div>
+
+              {/* UF de Destino Final */}
+              <div className="space-y-2">
+                <Tooltip content="Estado de destino final da mercadoria">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    UF de Destino Final
+                  </label>
+                </Tooltip>
+                <select
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  value={data.ufDestino || ''}
+                  onChange={e => onChange({ ...data, ufDestino: e.target.value })}
+                >
+                  <option value="">Selecione a UF</option>
+                  {estados.map(estado => <option key={estado.sigla} value={estado.sigla}>{estado.nome}</option>)}
+                </select>
+              </div>
+
+              {/* Modal Principal */}
+              <div className="space-y-2">
+                <Tooltip content="Modal de transporte principal">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    Modal Principal
+                  </label>
+                </Tooltip>
+                <select
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  value={data.modal || ''}
+                  onChange={e => onChange({ ...data, modal: e.target.value })}
+                >
+                  <option value="">Selecione o modal...</option>
+                  {getModaisElegiveis(data.paisOrigem).map(m => (
+                    <option key={m.value} value={m.value} disabled={m.disabled}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Moeda */}
+              <div className="space-y-2">
+                <Tooltip content="Moeda principal da negociação">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                    Moeda
+                  </label>
+                </Tooltip>
+                <select
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  value={data.moeda || ''}
+                  onChange={e => onChange({ ...data, moeda: e.target.value })}
+                >
+                  <option value="">Selecione</option>
+                  {moedas.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* PTAX Panel - Integrado e Elegante */}
+            <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 flex items-center">
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                  Cotações PTAX - Banco Central
+                </h4>
+                <div className="flex items-center space-x-2">
                   <input
                     type="date"
-                    className="w-full px-2 py-1 border border-blue-300 dark:border-blue-600 rounded bg-white dark:bg-gray-700 text-blue-900 dark:text-white"
+                    className="px-3 py-1 border border-blue-300 dark:border-blue-600 rounded text-xs bg-white dark:bg-slate-700 text-blue-900 dark:text-white"
                     value={ptaxDate}
                     onChange={e => setPtaxDate(e.target.value)}
                     max={new Date().toISOString().slice(0, 10)}
                   />
+                  <button
+                    type="button"
+                    onClick={buscarCotacao}
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                    title="Atualizar cotações"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="h-10 px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 text-xs transition-all duration-150 min-w-[120px] self-end md:self-auto"
-                  onClick={buscarCotacao}
-                  title="Buscar cotação PTAX do Banco Central para a data selecionada"
-                >Buscar Cotação</button>
               </div>
+              
+              {/* Painel PTAX Compacto */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg border border-blue-200 dark:border-blue-700 p-3 max-h-48 overflow-y-auto">
+                <PTAXPanel
+                  selectedDate={ptaxDate}
+                  onCurrencySelect={handleCurrencySelect}
+                  selectedCurrency={data.moeda}
+                />
+              </div>
+              
+              {/* Cotação Selecionada */}
+              {data.moeda && data.ptax && (
+                <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                        {data.moeda} Selecionada
+                      </span>
+                      <span className="text-xs text-green-600 dark:text-green-400">
+                        PTAX: R$ {parseFloat(data.ptax).toFixed(4)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPtaxEditable(true)}
+                      className="text-xs text-blue-600 hover:text-blue-800 dark:hover:text-blue-400 transition-colors"
+                      title="Editar cotação manualmente"
+                    >
+                      ✏️ Editar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Zona Aduaneira - Card Melhorado */}
+          <div className="bg-gradient-to-br from-slate-50 to-green-50 dark:from-slate-800 dark:to-green-900/20 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center">
+              <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              Zona Aduaneira
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Indicador de zona selecionada */}
+              {data.zonaAduaneira && (
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                      <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                        Zona Selecionada: {zonasFiltradas.find(z => z.codigo === data.zonaAduaneira)?.nome || data.zonaAduaneira}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onChange({ ...data, zonaAduaneira: '' })
+                        setBuscaZona('')
+                      }}
+                      className="text-red-600 hover:text-red-800 text-xs"
+                    >
+                      ✕ Limpar
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              <input
+                className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                type="text"
+                placeholder={data.zonaAduaneira ? "Zona selecionada - digite para buscar outras..." : "Buscar por nome, cidade, UF ou código..."}
+                value={buscaZona}
+                onChange={e => setBuscaZona(e.target.value)}
+                disabled={!data.ufDesembaraco || !data.modal}
+              />
+              
+              <div className="space-y-2 max-h-56 overflow-y-auto border border-slate-300 dark:border-slate-600 rounded-lg p-2 bg-white dark:bg-slate-800">
+                {/* Zonas Primárias */}
+                <div>
+                  <div className="font-bold text-xs text-blue-700 dark:text-blue-300 mb-1 mt-2">Zona Primária (Portos, Aeroportos, Fronteiras)</div>
+                  {zonasPrimarias.length === 0 && <div className="text-xs text-gray-400">Nenhum encontrado</div>}
+                  {zonasPrimarias.map(z => (
+                    <button
+                      key={z.codigo}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900 transition flex items-center gap-2 ${data.zonaAduaneira === z.codigo ? 'bg-blue-100 dark:bg-blue-800 font-semibold border-2 border-blue-500' : ''}`}
+                      disabled={!data.ufDesembaraco || !data.modal}
+                      onClick={() => selecionarZonaAduaneira(z)}
+                      title={`Nome: ${z.nome}\nTipo: ${z.tipo}\nCidade: ${z.cidade}\nUF: ${z.uf}\nStatus: ${z.status}\n${z.observacoes ? 'Obs: ' + z.observacoes : ''}${z.parceiro ? '\nParceiro SmartImport' : ''}`}
+                    >
+                      <span className={`inline-block w-2 h-2 rounded-full mr-2 ${z.tipo === 'porto' ? 'bg-blue-500' : z.tipo === 'aeroporto' ? 'bg-purple-500' : 'bg-yellow-500'}`}></span>
+                      <span>{z.nome}</span>
+                      <span className="ml-auto text-xs text-gray-500">{z.cidade} - {z.uf}</span>
+                      {z.parceiro && <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">Parceiro</span>}
+                      {data.zonaAduaneira === z.codigo && (
+                        <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">✓ Selecionado</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* EADIs */}
+                <div>
+                  <div className="font-bold text-xs text-pink-700 dark:text-pink-300 mb-1 mt-2">EADI (Estações Aduaneiras do Interior)</div>
+                  {zonasEADI.length === 0 && <div className="text-xs text-gray-400">Nenhum EADI encontrado</div>}
+                  {zonasEADI.map(z => (
+                    <button
+                      key={z.codigo}
+                      className={`w-full text-left px-3 py-2 rounded hover:bg-pink-50 dark:hover:bg-pink-900 transition flex items-center gap-2 ${data.zonaAduaneira === z.codigo ? 'bg-pink-100 dark:bg-pink-800 font-semibold border-2 border-pink-500' : ''}`}
+                      disabled={!data.ufDesembaraco || !data.modal}
+                      onClick={() => selecionarZonaAduaneira(z)}
+                      title={`Nome: ${z.nome}\nTipo: EADI (Estação Aduaneira do Interior)\nCidade: ${z.cidade}\nUF: ${z.uf}\nStatus: ${z.status}\n${z.observacoes ? 'Obs: ' + z.observacoes : ''}${z.parceiro ? '\nParceiro SmartImport' : ''}`}
+                    >
+                      <span className="inline-block w-2 h-2 rounded-full mr-2 bg-pink-500"></span>
+                      <span>{z.nome}</span>
+                      <span className="ml-auto text-xs text-gray-500">{z.cidade} - {z.uf}</span>
+                      {z.parceiro && <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">Parceiro</span>}
+                      {data.zonaAduaneira === z.codigo && (
+                        <span className="ml-2 px-2 py-0.5 text-xs bg-pink-100 text-pink-700 rounded">✓ Selecionado</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {(!data.ufDesembaraco || !data.modal) && <div className="text-xs text-yellow-600 mt-2">Selecione a UF e o modal para habilitar a escolha.</div>}
             </div>
           </div>
         </div>
 
-        {/* Coluna 2 */}
-        <div className="space-y-4">
-          {/* Zona Aduaneira */}
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Zona Aduaneira
-              <span className="ml-1 text-gray-400 cursor-help" title="Selecione o local de desembaraço (Porto, Aeroporto, Fronteira ou EADI)">ⓘ</span>
-            </label>
-            {/* Indicador de zona selecionada */}
-            {data.zonaAduaneira && (
-              <div className="mb-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                    <span className="text-sm font-medium text-green-800 dark:text-green-200">
-                      Zona Selecionada: {zonasFiltradas.find(z => z.codigo === data.zonaAduaneira)?.nome || data.zonaAduaneira}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      onChange({ ...data, zonaAduaneira: '' })
-                      setBuscaZona('')
-                    }}
-                    className="text-red-600 hover:text-red-800 text-xs"
-                  >
-                    ✕ Limpar
-                  </button>
-                </div>
-              </div>
-            )}
-            <input
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 h-11 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2"
-              type="text"
-              placeholder={data.zonaAduaneira ? "Zona selecionada - digite para buscar outras..." : "Buscar por nome, cidade, UF ou código..."}
-              value={buscaZona}
-              onChange={e => setBuscaZona(e.target.value)}
-              disabled={!uf || !data.modal}
-            />
-            <div className="space-y-2 max-h-56 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
-              {/* Zonas Primárias */}
-              <div>
-                <div className="font-bold text-xs text-blue-700 dark:text-blue-300 mb-1 mt-2">Zona Primária (Portos, Aeroportos, Fronteiras)</div>
-                {zonasPrimarias.length === 0 && <div className="text-xs text-gray-400">Nenhum encontrado</div>}
-                {zonasPrimarias.map(z => (
-                  <button
-                    key={z.codigo}
-                    className={`w-full text-left px-3 py-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900 transition flex items-center gap-2 ${data.zonaAduaneira === z.codigo ? 'bg-blue-100 dark:bg-blue-800 font-semibold border-2 border-blue-500' : ''}`}
-                    disabled={!uf || !data.modal}
-                    onClick={() => selecionarZonaAduaneira(z)}
-                    title={`Nome: ${z.nome}\nTipo: ${z.tipo}\nCidade: ${z.cidade}\nUF: ${z.uf}\nStatus: ${z.status}\n${z.observacoes ? 'Obs: ' + z.observacoes : ''}${z.parceiro ? '\nParceiro SmartImport' : ''}`}
-                  >
-                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${z.tipo === 'porto' ? 'bg-blue-500' : z.tipo === 'aeroporto' ? 'bg-purple-500' : 'bg-yellow-500'}`}></span>
-                    <span>{z.nome}</span>
-                    <span className="ml-auto text-xs text-gray-500">{z.cidade} - {z.uf}</span>
-                    {z.parceiro && <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">Parceiro</span>}
-                    {data.zonaAduaneira === z.codigo && (
-                      <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">✓ Selecionado</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              {/* EADIs */}
-              <div>
-                <div className="font-bold text-xs text-pink-700 dark:text-pink-300 mb-1 mt-2">EADI (Estações Aduaneiras do Interior)</div>
-                {zonasEADI.length === 0 && <div className="text-xs text-gray-400">Nenhum EADI encontrado</div>}
-                {zonasEADI.map(z => (
-                  <button
-                    key={z.codigo}
-                    className={`w-full text-left px-3 py-2 rounded hover:bg-pink-50 dark:hover:bg-pink-900 transition flex items-center gap-2 ${data.zonaAduaneira === z.codigo ? 'bg-pink-100 dark:bg-pink-800 font-semibold border-2 border-pink-500' : ''}`}
-                    disabled={!uf || !data.modal}
-                    onClick={() => selecionarZonaAduaneira(z)}
-                    title={`Nome: ${z.nome}\nTipo: EADI (Estação Aduaneira do Interior)\nCidade: ${z.cidade}\nUF: ${z.uf}\nStatus: ${z.status}\n${z.observacoes ? 'Obs: ' + z.observacoes : ''}${z.parceiro ? '\nParceiro SmartImport' : ''}`}
-                  >
-                    <span className="inline-block w-2 h-2 rounded-full mr-2 bg-pink-500"></span>
-                    <span>{z.nome}</span>
-                    <span className="ml-auto text-xs text-gray-500">{z.cidade} - {z.uf}</span>
-                    {z.parceiro && <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">Parceiro</span>}
-                    {data.zonaAduaneira === z.codigo && (
-                      <span className="ml-2 px-2 py-0.5 text-xs bg-pink-100 text-pink-700 rounded">✓ Selecionado</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {(!uf || !data.modal) && <div className="text-xs text-yellow-600 mt-2">Selecione a UF e o modal para habilitar a escolha.</div>}
-          </div>
-
-          {/* Upload de Documento - Destaque */}
-          <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-50 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-indigo-900/20 p-6 rounded-xl shadow-lg border border-blue-200/50 dark:border-blue-700/50 backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
+        {/* Coluna 2: Upload e Produtos */}
+        <div className="space-y-6">
+          {/* Upload Inteligente - Card Melhorado */}
+          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 p-6 rounded-xl border border-purple-200 dark:border-purple-800 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
                   <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1328,7 +1315,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    🚀 Upload Inteligente
+                     Upload Inteligente
                   </h3>
                   <p className="text-sm text-blue-700 dark:text-blue-300">
                     IA extrai produtos automaticamente
@@ -1437,12 +1424,14 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
                 </details>
               </div>
             )}
+            
             {largeDocAlert && (
               <div className="flex items-center text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2 mt-2 text-sm">
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 Documento grande detectado. O processamento pode demorar mais que o normal.
               </div>
             )}
+            
             {(progressState.stage === 'extracting' || progressState.stage === 'analyzing') && (
               <div className="w-full flex flex-col items-center my-6">
                 <div className="mb-4 font-bold text-lg flex items-center gap-3">
@@ -1488,6 +1477,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
                 )}
               </div>
             )}
+            
             {(progressState.stage === 'extracting' || progressState.stage === 'analyzing') && (
               <button 
                 onClick={resetProcessamento} 
@@ -1499,6 +1489,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
                 Cancelar Processamento
               </button>
             )}
+            
             {!processingDocument && documentText && (
               <button 
                 onClick={handleExtrairProdutos} 
@@ -1511,6 +1502,306 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
               </button>
             )}
           </div>
+
+          {/* Produtos e NCMs - Card Melhorado */}
+          <div className="bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-800 dark:to-blue-900/20 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center">
+                <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mr-3">
+                  <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </div>
+                Produtos e NCMs
+              </h3>
+              <button
+                onClick={adicionarProduto}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm hover:shadow-md"
+              >
+                + Adicionar Produto
+              </button>
+            </div>
+            
+            {produtos.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <p>Nenhum produto adicionado. Adicione produtos manualmente ou faça upload de um documento.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {produtos.map((produto, index) => (
+                  <div key={produto.id} className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-gray-900 dark:text-white">Produto {index + 1}</h4>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => removerProduto(produto.id)}
+                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          ✕ Remover
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                          Descrição do Produto
+                        </label>
+                        <textarea
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          rows="3"
+                          value={produto.descricao}
+                          onChange={e => atualizarProduto(produto.id, 'descricao', e.target.value)}
+                          placeholder="Descrição detalhada do produto (mín. 50 caracteres para IA)"
+                        />
+                        {produto.descricao && produto.descricao.length < 50 && (
+                          <div className="text-xs text-yellow-600 mt-1">
+                            {50 - produto.descricao.length} caracteres restantes para sugestão de NCM
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                          NCM
+                        </label>
+                        <div className="flex gap-2">
+                          <div className="flex-1 relative">
+                            <input
+                              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              value={produto.ncm}
+                              onChange={e => atualizarProduto(produto.id, 'ncm', e.target.value)}
+                              onBlur={e => {
+                                const ncmClean = e.target.value.replace(/[.\-\s]/g, '')
+                                const ncmDigits = ncmClean.replace(/\D/g, '')
+                                if (ncmDigits.length === 8 && /^\d+$/.test(ncmDigits)) {
+                                  atualizarProduto(produto.id, 'ncm', e.target.value)
+                                }
+                              }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter' || e.key === 'Tab') {
+                                  const ncmClean = e.target.value.replace(/[.\-\s]/g, '')
+                                  const ncmDigits = ncmClean.replace(/\D/g, '')
+                                  if (ncmDigits.length === 8 && /^\d+$/.test(ncmDigits)) {
+                                    atualizarProduto(produto.id, 'ncm', e.target.value)
+                                  }
+                                }
+                              }}
+                              placeholder="Ex: 8517.12.00"
+                            />
+                            {produto.consultandoTTCE && (
+                              <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleNcmSuggest(produto.id)}
+                            className="px-3 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!produto.descricao || produto.descricao.trim() === ''}
+                            title="Sugestão automática de NCM"
+                          >
+                            IA
+                          </button>
+                          {produto.ncm && (
+                            <button
+                              onClick={() => abrirModalRefinamento(produto.id)}
+                              className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                              title="Refinar classificação NCM"
+                            >
+                              🔧
+                            </button>
+                          )}
+                        </div>
+                        
+                        {/* Sugestões de NCM */}
+                        {produto.ncmSugestoes && produto.ncmSugestoes.length > 0 && (
+                          <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                            <div className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
+                              Sugestões de NCM:
+                            </div>
+                            <div className="space-y-1">
+                              {produto.ncmSugestoes.slice(0, 3).map((sugestao, idx) => (
+                                <div key={idx} className="text-xs text-blue-700 dark:text-blue-300">
+                                  <span className="font-mono">{sugestao.ncm}</span> - {sugestao.descricao}
+                                  <span className="ml-2 text-blue-600">
+                                    ({(sugestao.score * 100).toFixed(0)}%)
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Informações adicionais necessárias */}
+                        {produto.ncmInformacoesAdicionais && produto.ncmInformacoesAdicionais.length > 0 && (
+                          <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                            <div className="text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-1">
+                              Informações adicionais que ajudariam na classificação:
+                            </div>
+                            <ul className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1">
+                              {produto.ncmInformacoesAdicionais.map((info, idx) => (
+                                <li key={idx}>• {info}</li>
+                              ))}
+                            </ul>
+                            <button
+                              onClick={() => abrirModalRefinamento(produto.id)}
+                              className="mt-2 px-2 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                            >
+                              Fornecer Informações
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Resultado do refinamento */}
+                        {produto.ncmRefinamento && (
+                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                            <div className="text-xs font-medium text-green-800 dark:text-green-200 mb-1">
+                              NCM Refinado:
+                            </div>
+                            <div className="text-xs text-green-700 dark:text-green-300">
+                              <div className="font-mono">{produto.ncmRefinamento.ncmFinal}</div>
+                              <div className="mt-1">{produto.ncmRefinamento.justificativa}</div>
+                              <div className="mt-1 text-green-600">
+                                Confiança: {(produto.ncmRefinamento.confianca * 100).toFixed(1)}%
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Dados TTCE */}
+                        {produto.ttceData && (
+                          <div className={`mt-2 p-2 rounded-lg border ${
+                            produto.ttceData.isSimulated 
+                              ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700' 
+                              : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
+                          }`}>
+                            <div className={`text-xs font-medium mb-1 ${
+                              produto.ttceData.isSimulated 
+                                ? 'text-yellow-800 dark:text-yellow-200' 
+                                : 'text-blue-800 dark:text-blue-200'
+                            }`}>
+                              {produto.ttceData.isSimulated ? '⚠️ Dados Simulados' : '✅ TTCE - Dados Oficiais'}
+                            </div>
+                            <div className={`text-xs ${
+                              produto.ttceData.isSimulated 
+                                ? 'text-yellow-700 dark:text-yellow-300' 
+                                : 'text-blue-700 dark:text-blue-300'
+                            }`}>
+                              <div className="font-semibold mb-1">{produto.ttceData.descricaoOficial}</div>
+                              {produto.ttceData.tratamentos && produto.ttceData.tratamentos.length > 0 && (
+                                <div className="mt-1">
+                                  <div className="font-medium mb-1">Tratamentos Tributários:</div>
+                                  {produto.ttceData.tratamentos.map((tratamento, idx) => (
+                                    <div key={idx} className="flex justify-between items-center py-1">
+                                      <span>{tratamento.descricao}</span>
+                                      <span className="font-mono text-blue-600">{tratamento.aliquota}%</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {produto.ttceData.observacoes && (
+                                <div className="mt-1 text-blue-600 italic">
+                                  Obs: {produto.ttceData.observacoes}
+                                </div>
+                              )}
+                              {produto.ttceData.isSimulated && (
+                                <div className="mt-2 p-2 bg-yellow-100 dark:bg-yellow-800/30 rounded text-xs">
+                                  <div className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">
+                                    ⚠️ Dados Simulados
+                                  </div>
+                                  <div className="text-yellow-700 dark:text-yellow-300">
+                                    A API do Siscomex não está acessível no momento. 
+                                    Estes dados são apenas para demonstração.
+                                    <br />
+                                    <strong>Consulte um despachante para validação oficial.</strong>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Campos adicionais */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                          Quantidade
+                        </label>
+                        <input
+                          type="number"
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          value={produto.quantidade}
+                          onChange={e => atualizarProduto(produto.id, 'quantidade', parseFloat(e.target.value) || 0)}
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                          Valor Unitário ({data.moeda || 'USD'})
+                        </label>
+                        <input
+                          type="number"
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          value={produto.valorUnitario}
+                          onChange={e => atualizarProduto(produto.id, 'valorUnitario', parseFloat(e.target.value) || 0)}
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                          Valor Total ({data.moeda || 'USD'})
+                        </label>
+                        <div className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800">
+                          {(produto.quantidade * produto.valorUnitario).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Status dos Campos Obrigatórios - Card Melhorado */}
+      <div className="bg-gradient-to-br from-slate-50 to-amber-50 dark:from-slate-800 dark:to-amber-900/20 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center">
+            <div className="w-6 h-6 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            Status dos Campos Obrigatórios
+          </h3>
+          <button
+            onClick={debugValidation}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm hover:shadow-md"
+          >
+            Preencher todos os campos
+          </button>
+        </div>
+        
+        <div className="flex flex-wrap gap-3">
+          {Object.entries(validationStatus).map(([field, status]) => (
+            <div
+              key={field}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                status 
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border border-green-200 dark:border-green-800' 
+                  : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-800'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span>{field}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -1529,270 +1820,6 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
           )}
         </div>
       )}
-
-      {/* Seção de Produtos */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Produtos e NCMs</h3>
-          <div className="flex items-center gap-3">
-            {showProductDetailsButton && (
-              <button
-                onClick={abrirModalDetalhesProdutos}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                📋 Ver Detalhes
-              </button>
-            )}
-            <button
-              onClick={adicionarProduto}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              + Adicionar Produto
-            </button>
-          </div>
-        </div>
-
-        {produtos.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p>Nenhum produto adicionado. Adicione produtos manualmente ou faça upload de um documento.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {produtos.map((produto, index) => (
-              <div key={produto.id} className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-gray-900 dark:text-white">Produto {index + 1}</h4>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => removerProduto(produto.id)}
-                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      ✕ Remover
-                    </button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                      Descrição do Produto
-                    </label>
-                    <textarea
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      rows="3"
-                      value={produto.descricao}
-                      onChange={e => atualizarProduto(produto.id, 'descricao', e.target.value)}
-                      placeholder="Descrição detalhada do produto (mín. 50 caracteres para IA)"
-                    />
-                    {produto.descricao && produto.descricao.length < 50 && (
-                      <div className="text-xs text-yellow-600 mt-1">
-                        {50 - produto.descricao.length} caracteres restantes para sugestão de NCM
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                      NCM
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="flex-1 relative">
-                        <input
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          value={produto.ncm}
-                          onChange={e => atualizarProduto(produto.id, 'ncm', e.target.value)}
-                          onBlur={e => {
-                            const ncmClean = e.target.value.replace(/[.\-\s]/g, '')
-                            const ncmDigits = ncmClean.replace(/\D/g, '')
-                            if (ncmDigits.length === 8 && /^\d+$/.test(ncmDigits)) {
-                              atualizarProduto(produto.id, 'ncm', e.target.value)
-                            }
-                          }}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter' || e.key === 'Tab') {
-                              const ncmClean = e.target.value.replace(/[.\-\s]/g, '')
-                              const ncmDigits = ncmClean.replace(/\D/g, '')
-                              if (ncmDigits.length === 8 && /^\d+$/.test(ncmDigits)) {
-                                atualizarProduto(produto.id, 'ncm', e.target.value)
-                              }
-                            }
-                          }}
-                          placeholder="Ex: 8517.12.00"
-                        />
-                        {produto.consultandoTTCE && (
-                          <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => handleNcmSuggest(produto.id)}
-                        className="px-3 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={!produto.descricao || produto.descricao.length < 50}
-                        title="Sugestão automática de NCM"
-                      >
-                        IA
-                      </button>
-                      {produto.ncm && (
-                        <button
-                          onClick={() => abrirModalRefinamento(produto.id)}
-                          className="px-3 py-2 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                          title="Refinar classificação NCM"
-                        >
-                          🔧
-                        </button>
-                      )}
-                    </div>
-                    
-                    {/* Sugestões de NCM */}
-                    {produto.ncmSugestoes && produto.ncmSugestoes.length > 0 && (
-                      <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <div className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
-                          Sugestões de NCM:
-                        </div>
-                        <div className="space-y-1">
-                          {produto.ncmSugestoes.slice(0, 3).map((sugestao, idx) => (
-                            <div key={idx} className="text-xs text-blue-700 dark:text-blue-300">
-                              <span className="font-mono">{sugestao.ncm}</span> - {sugestao.descricao}
-                              <span className="ml-2 text-blue-600">
-                                ({(sugestao.score * 100).toFixed(0)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Informações adicionais necessárias */}
-                    {produto.ncmInformacoesAdicionais && produto.ncmInformacoesAdicionais.length > 0 && (
-                      <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                        <div className="text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-1">
-                          Informações adicionais que ajudariam na classificação:
-                        </div>
-                        <ul className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1">
-                          {produto.ncmInformacoesAdicionais.map((info, idx) => (
-                            <li key={idx}>• {info}</li>
-                          ))}
-                        </ul>
-                        <button
-                          onClick={() => abrirModalRefinamento(produto.id)}
-                          className="mt-2 px-2 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700"
-                        >
-                          Fornecer Informações
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Resultado do refinamento */}
-                    {produto.ncmRefinamento && (
-                      <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                        <div className="text-xs font-medium text-green-800 dark:text-green-200 mb-1">
-                          NCM Refinado:
-                        </div>
-                        <div className="text-xs text-green-700 dark:text-green-300">
-                          <div className="font-mono">{produto.ncmRefinamento.ncmFinal}</div>
-                          <div className="mt-1">{produto.ncmRefinamento.justificativa}</div>
-                          <div className="mt-1 text-green-600">
-                            Confiança: {(produto.ncmRefinamento.confianca * 100).toFixed(1)}%
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Dados TTCE */}
-                    {produto.ttceData && (
-                      <div className={`mt-2 p-2 rounded-lg border ${
-                        produto.ttceData.isSimulated 
-                          ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700' 
-                          : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
-                      }`}>
-                        <div className={`text-xs font-medium mb-1 ${
-                          produto.ttceData.isSimulated 
-                            ? 'text-yellow-800 dark:text-yellow-200' 
-                            : 'text-blue-800 dark:text-blue-200'
-                        }`}>
-                          {produto.ttceData.isSimulated ? '⚠️ Dados Simulados' : '✅ TTCE - Dados Oficiais'}
-                        </div>
-                        <div className={`text-xs ${
-                          produto.ttceData.isSimulated 
-                            ? 'text-yellow-700 dark:text-yellow-300' 
-                            : 'text-blue-700 dark:text-blue-300'
-                        }`}>
-                          <div className="font-semibold mb-1">{produto.ttceData.descricaoOficial}</div>
-                          {produto.ttceData.tratamentos && produto.ttceData.tratamentos.length > 0 && (
-                            <div className="mt-1">
-                              <div className="font-medium mb-1">Tratamentos Tributários:</div>
-                              {produto.ttceData.tratamentos.map((tratamento, idx) => (
-                                <div key={idx} className="flex justify-between items-center py-1">
-                                  <span>{tratamento.descricao}</span>
-                                  <span className="font-mono text-blue-600">{tratamento.aliquota}%</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {produto.ttceData.observacoes && (
-                            <div className="mt-1 text-blue-600 italic">
-                              Obs: {produto.ttceData.observacoes}
-                            </div>
-                          )}
-                          {produto.ttceData.isSimulated && (
-                            <div className="mt-2 p-2 bg-yellow-100 dark:bg-yellow-800/30 rounded text-xs">
-                              <div className="font-medium text-yellow-800 dark:text-yellow-200 mb-1">
-                                ⚠️ Dados Simulados
-                              </div>
-                              <div className="text-yellow-700 dark:text-yellow-300">
-                                A API do Siscomex não está acessível no momento. 
-                                Estes dados são apenas para demonstração.
-                                <br />
-                                <strong>Consulte um despachante para validação oficial.</strong>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                      Quantidade
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={produto.quantidade}
-                      onChange={e => atualizarProduto(produto.id, 'quantidade', parseInt(e.target.value) || 0)}
-                      min="1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                      Valor Unitário ({data.moeda || 'USD'})
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={produto.valorUnitario}
-                      onChange={e => atualizarProduto(produto.id, 'valorUnitario', parseFloat(e.target.value) || 0)}
-                      min="0"
-                    />
-                  </div>
-                </div>
-
-                {/* Botão Adicionar Produto abaixo de cada item */}
-                {index === produtos.length - 1 && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-                    <button
-                      onClick={adicionarProduto}
-                      className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border-2 border-dashed border-gray-300 dark:border-gray-600"
-                    >
-                      + Adicionar Próximo Produto
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Botões de Ação */}
       <div className="flex items-center justify-between mt-8">
@@ -1839,101 +1866,6 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
           </svg>
           {isValid ? '🚀 Iniciar Simulação' : '⏳ Preencha todos os campos'}
         </button>
-      </div>
-
-      {/* Indicadores de validação */}
-      <div className="mt-6 p-6 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-900/20 rounded-xl border border-gray-200/50 dark:border-gray-700/50">
-        <h4 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Status dos Campos Obrigatórios
-        </h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          <div className={`flex items-center p-3 rounded-lg transition-all duration-200 ${
-            data.paisOrigem 
-              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-              : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-          }`}>
-            <span className={`w-3 h-3 rounded-full mr-3 ${data.paisOrigem ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-            <span className={`text-sm font-medium ${data.paisOrigem ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-              País de Origem
-            </span>
-          </div>
-          <div className={`flex items-center p-3 rounded-lg transition-all duration-200 ${
-            data.ufDesembaraco 
-              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-              : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-          }`}>
-            <span className={`w-3 h-3 rounded-full mr-3 ${data.ufDesembaraco ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-            <span className={`text-sm font-medium ${data.ufDesembaraco ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-              UF Desembaraço
-            </span>
-          </div>
-          <div className={`flex items-center p-3 rounded-lg transition-all duration-200 ${
-            data.ufDestino 
-              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-              : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-          }`}>
-            <span className={`w-3 h-3 rounded-full mr-3 ${data.ufDestino ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-            <span className={`text-sm font-medium ${data.ufDestino ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-              UF Destino
-            </span>
-          </div>
-          <div className={`flex items-center p-3 rounded-lg transition-all duration-200 ${
-            data.modal 
-              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-              : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-          }`}>
-            <span className={`w-3 h-3 rounded-full mr-3 ${data.modal ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-            <span className={`text-sm font-medium ${data.modal ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-              Modal
-            </span>
-          </div>
-          <div className={`flex items-center p-3 rounded-lg transition-all duration-200 ${
-            data.moeda 
-              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-              : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-          }`}>
-            <span className={`w-3 h-3 rounded-full mr-3 ${data.moeda ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-            <span className={`text-sm font-medium ${data.moeda ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-              Moeda
-            </span>
-            {data.moeda && (
-              <span className="ml-2 text-xs text-blue-700 dark:text-blue-300 font-bold">{data.moeda}</span>
-            )}
-          </div>
-          <div className={`flex items-center p-3 rounded-lg transition-all duration-200 ${
-            data.zonaAduaneira 
-              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-              : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-          }`}>
-            <span className={`w-3 h-3 rounded-full mr-3 ${data.zonaAduaneira ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-            <span className={`text-sm font-medium ${data.zonaAduaneira ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-              Zona Aduaneira
-            </span>
-          </div>
-          <div className={`flex items-center p-3 rounded-lg transition-all duration-200 ${
-            produtos.length > 0 
-              ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-              : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-          }`}>
-            <span className={`w-3 h-3 rounded-full mr-3 ${produtos.length > 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
-            <span className={`text-sm font-medium ${produtos.length > 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-              Produtos ({produtos.length})
-            </span>
-          </div>
-        </div>
-        {isValid && (
-          <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-green-700 dark:text-green-300 font-medium">Todos os campos obrigatórios foram preenchidos!</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Modal de IA */}
@@ -1991,7 +1923,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
                     onChange={e => setIaTextInput(e.target.value)}
                   />
                   <button
-                    onClick={analisarTextoIA}
+                    onClick={() => analisarTextoIA(selectedProductForIA, iaTextInput)}
                     className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!iaTextInput || iaTextInput.length < 50}
                   >
@@ -2004,252 +1936,26 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
         </div>
       )}
 
-      {/* Modal de Refinamento de NCM */}
-      {showRefinementModal && selectedProductForRefinement !== null && (
+      {/* Modais */}
+      {showRefinementModal && (
         <NCMRefinementModal
           isOpen={showRefinementModal}
           onClose={() => setShowRefinementModal(false)}
+          onApply={aplicarNCMRefinado}
+          produtoId={selectedProductForRefinement}
           produto={produtos.find(p => p.id === selectedProductForRefinement)}
-          onNCMRefined={aplicarNCMRefinado}
-          ncmSugerido={produtos.find(p => p.id === selectedProductForRefinement)?.ncm || ''}
         />
       )}
 
-      {/* Modal de Detalhes dos Produtos */}
       {showProductDetailsModal && (
         <ProductDetailsModal
           isOpen={showProductDetailsModal}
           onClose={fecharModalDetalhesProdutos}
-          products={produtos}
           onSave={salvarProdutosDetalhados}
+          produtos={produtos}
           onAnalyzeNCM={analisarNCMProdutoDetalhado}
         />
       )}
-
-      {/* Botões de ação premium - Elegantes e Profissionais */}
-      {uploadFile && !processingDocument && (
-        <div className="mt-6 p-6 bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 dark:from-slate-800/50 dark:via-gray-800/50 dark:to-slate-900/50 rounded-xl border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-sm animate-fade-in-up shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-lg font-bold bg-gradient-to-r from-slate-700 to-gray-800 dark:from-slate-300 dark:to-gray-200 bg-clip-text text-transparent flex items-center gap-3">
-              <FaCrown className="text-amber-500 animate-pulse-subtle" />
-              Recursos Premium
-            </h4>
-            <span className="text-xs text-white bg-gradient-to-r from-amber-500 to-orange-600 px-3 py-1.5 rounded-full font-medium shadow-sm">
-              ⭐ Premium
-            </span>
-          </div>
-          
-          <div className="flex gap-3">
-            <button
-              onClick={handleAnalisarComIA}
-              className="premium-button premium-gradient flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-white shadow-lg transition-all duration-300 hover:scale-105"
-              title="Análise avançada com IA - Extrai produtos e sugere NCMs com alta precisão"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-              Analisar com IA
-            </button>
-            <button
-              onClick={handleVisualizarDocumento}
-              className="premium-button glass-button flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-white shadow-lg transition-all duration-300 hover:scale-105"
-              title="Visualizar documento original completo"
-            >
-              <FaEye className="w-4 h-4" />
-              Visualizar Documento
-            </button>
-          </div>
-          
-          <div className="mt-4 text-sm text-slate-700 dark:text-slate-300">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-emerald-600">✨</span>
-              <span>Análise inteligente extrai produtos automaticamente</span>
-            </div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-emerald-600">🎯</span>
-              <span>Sugere NCMs com alta precisão e assertividade</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-emerald-600">📊</span>
-              <span>Visualização completa do documento original</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de upgrade premium - Elegante */}
-      {showUpgradeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg max-w-lg w-full relative p-6">
-            <button
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xl"
-              onClick={() => setShowUpgradeModal(false)}
-            >
-              ✕
-            </button>
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FaCrown className="text-2xl text-slate-600 dark:text-slate-400" />
-              </div>
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">Recurso Premium</h2>
-              <p className="text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
-                Este recurso está disponível apenas para assinantes Pro/Premium.<br/>
-                Faça upgrade para liberar análise avançada com IA e visualização completa de documentos.
-              </p>
-              <div className="space-y-3">
-                <a 
-                  href="/upgrade" 
-                  className="inline-block w-full px-6 py-3 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-medium shadow-sm transition-all duration-200 hover:shadow-md"
-                >
-                  Fazer Upgrade
-                </a>
-                <button 
-                  onClick={() => setShowUpgradeModal(false)} 
-                  className="w-full px-6 py-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de visualização do documento original - Elegante */}
-      {showDocModal && uploadFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg max-w-4xl w-full relative p-6">
-            <button
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xl"
-              onClick={() => setShowDocModal(false)}
-            >
-              ✕
-            </button>
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <FaEye className="text-slate-500" />
-                  Documento Original
-                </h3>
-                <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full">
-                  Visualização
-                </span>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4 mb-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded flex items-center justify-center">
-                    <svg className="w-4 h-4 text-slate-600 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{uploadFile?.name}</p>
-                    <p className="text-xs text-slate-500">{(uploadFile?.size / 1024 / 1024).toFixed(2)} MB</p>
-                  </div>
-                </div>
-              </div>
-              {/* Visualização do documento */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                {uploadFile.type === 'application/pdf' ? (
-                  <iframe 
-                    src={URL.createObjectURL(uploadFile)} 
-                    className="w-full h-96" 
-                    title="Documento Original"
-                    style={{ border: 'none' }}
-                  />
-                ) : uploadFile.type.startsWith('image/') ? (
-                  <img src={URL.createObjectURL(uploadFile)} alt="Preview" className="w-full max-h-96 object-contain mx-auto" />
-                ) : uploadFile.type === 'text/plain' ? (
-                  <pre className="p-4 text-xs overflow-x-auto max-h-96 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100">{documentText || 'Texto extraído será exibido aqui.'}</pre>
-                ) : (
-                  <div className="p-8 text-center text-slate-500">
-                    <svg className="w-16 h-16 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p>Visualização não suportada para este tipo de arquivo.<br/>Baixe para visualizar: <a href={URL.createObjectURL(uploadFile)} download={uploadFile.name} className="underline text-blue-600">Download</a></p>
-                  </div>
-                )}
-              </div>
-              <div className="flex justify-end mt-4">
-                <button 
-                  onClick={() => setShowDocModal(false)} 
-                  className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Data de Cotação PTAX */}
-      <div>
-        <Tooltip content="Data de referência para a cotação PTAX do Banco Central">
-          <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center">
-            <svg className="w-4 h-4 mr-2 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Data de Cotação PTAX
-          </label>
-        </Tooltip>
-        <div className="flex space-x-2">
-          <input
-            type="date"
-            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 h-11 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={ptaxDate || ''}
-            onChange={e => setPtaxDate(e.target.value)}
-            max={new Date().toISOString().split('T')[0]}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPTAXPanel(!showPTAXPanel)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center space-x-2 transition-colors"
-          >
-            <DollarSign className="w-4 h-4" />
-            <span className="text-sm font-medium">Ver Cotações</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Painel PTAX */}
-      {showPTAXPanel && (
-        <div className="col-span-full mt-4">
-          <PTAXPanel
-            selectedDate={ptaxDate}
-            onCurrencySelect={handleCurrencySelect}
-            selectedCurrency={data.moeda}
-          />
-        </div>
-      )}
-
-      {/* Moeda */}
-      <div>
-        <Tooltip content="Moeda principal utilizada na negociação da importação">
-          <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 flex items-center">
-            <svg className="w-4 h-4 mr-2 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-            </svg>
-            Moeda Selecionada
-          </label>
-        </Tooltip>
-        <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-          <div className="flex items-center space-x-2">
-            {data.moeda === 'USD' && <DollarSign className="w-5 h-5 text-green-600" />}
-            {data.moeda === 'EUR' && <Euro className="w-5 h-5 text-blue-600" />}
-            {data.moeda === 'GBP' && <PoundSterling className="w-5 h-5 text-purple-600" />}
-            {data.moeda === 'JPY' && <CircleDollarSign className="w-5 h-5 text-red-600" />}
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {data.moeda || 'Não selecionada'}
-            </span>
-          </div>
-          {data.ptax && (
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              PTAX: R$ {parseFloat(data.ptax).toFixed(4)}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   )
 }

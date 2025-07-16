@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import Sidebar from './Sidebar'
-import Header from './Header'
+import Sidebar from './Sidebar.tsx'
+import Header from './Header.tsx'
 
 const Layout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -9,7 +9,7 @@ const Layout: React.FC = () => {
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {/* Sidebar sempre visível em desktop */}
-      <div className="hidden lg:block lg:w-64">
+      <div className="hidden lg:block lg:w-64 lg:flex-shrink-0">
         <Sidebar isOpen={true} onClose={() => setIsSidebarOpen(false)} />
       </div>
       

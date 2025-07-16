@@ -47,23 +47,37 @@ const TributosTab: React.FC<TributosTabProps> = ({ data, onChange, onNext, onPre
       const fcp = parseFloat(data.fcp) || 0
       const afrmm = parseFloat(data.afrmm) || 0
 
-      const brlIi = await convertToBRL(ii, currency)
-      const brlIpi = await convertToBRL(ipi, currency)
-      const brlPis = await convertToBRL(pis, currency)
-      const brlCofins = await convertToBRL(cofins, currency)
-      const brlIcms = await convertToBRL(icms, currency)
-      const brlFcp = await convertToBRL(fcp, currency)
-      const brlAfrmm = await convertToBRL(afrmm, currency)
+      try {
+        const brlIi = await convertToBRL(ii, currency)
+        const brlIpi = await convertToBRL(ipi, currency)
+        const brlPis = await convertToBRL(pis, currency)
+        const brlCofins = await convertToBRL(cofins, currency)
+        const brlIcms = await convertToBRL(icms, currency)
+        const brlFcp = await convertToBRL(fcp, currency)
+        const brlAfrmm = await convertToBRL(afrmm, currency)
 
-      setBrlValues({
-        ii: brlIi,
-        ipi: brlIpi,
-        pis: brlPis,
-        cofins: brlCofins,
-        icms: brlIcms,
-        fcp: brlFcp,
-        afrmm: brlAfrmm
-      })
+        setBrlValues({
+          ii: brlIi,
+          ipi: brlIpi,
+          pis: brlPis,
+          cofins: brlCofins,
+          icms: brlIcms,
+          fcp: brlFcp,
+          afrmm: brlAfrmm
+        })
+      } catch (error) {
+        console.error('❌ Erro na conversão PTAX:', error)
+        // Em caso de erro, usar valores originais
+        setBrlValues({
+          ii: ii,
+          ipi: ipi,
+          pis: pis,
+          cofins: cofins,
+          icms: icms,
+          fcp: fcp,
+          afrmm: afrmm
+        })
+      }
     }
 
     calculateBrlValues()

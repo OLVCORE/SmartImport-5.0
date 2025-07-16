@@ -1,222 +1,175 @@
 import React, { useState, useEffect } from 'react'
-import { DollarSign, Euro, PoundSterling, TrendingUp, TrendingDown, RefreshCw, Calendar, CircleDollarSign } from 'lucide-react'
+import { DollarSign, Euro, PoundSterling, RefreshCw, Globe, AlertTriangle, CheckCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { getPtaxRate } from '../../services/ptaxService.js'
 
 const PTAXPanel = ({ selectedDate, onCurrencySelect, selectedCurrency }) => {
   const [ptaxData, setPtaxData] = useState({})
   const [loading, setLoading] = useState(false)
   const [lastUpdate, setLastUpdate] = useState(null)
+  const [error, setError] = useState(null)
+  const [isExpanded, setIsExpanded] = useState(false)
 
-  const mainCurrencies = [
-    { code: 'USD', name: 'Dólar Americano', icon: DollarSign, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
-    { code: 'EUR', name: 'Euro', icon: Euro, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
-    { code: 'GBP', name: 'Libra Esterlina', icon: PoundSterling, color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
-    { code: 'JPY', name: 'Iene Japonês', icon: CircleDollarSign, color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' }
+  const allCurrencies = [
+    { code: 'USD', name: 'Dólar Americano', symbol: '$', icon: DollarSign },
+    { code: 'EUR', name: 'Euro', symbol: '€', icon: Euro },
+    { code: 'GBP', name: 'Libra Esterlina', symbol: '£', icon: PoundSterling },
+    { code: 'JPY', name: 'Iene Japonês', symbol: '¥', icon: DollarSign },
+    { code: 'CAD', name: 'Dólar Canadense', symbol: 'C$', icon: DollarSign },
+    { code: 'AUD', name: 'Dólar Australiano', symbol: 'A$', icon: DollarSign },
+    { code: 'CHF', name: 'Franco Suíço', symbol: 'CHF', icon: DollarSign },
+    { code: 'CNY', name: 'Yuan Chinês', symbol: '¥', icon: DollarSign },
+    { code: 'ARS', name: 'Peso Argentino', symbol: '$', icon: DollarSign },
+    { code: 'BRL', name: 'Real Brasileiro', symbol: 'R$', icon: DollarSign }
   ]
 
+  const mainCurrencies = allCurrencies.slice(0, 4)
+  const secondaryCurrencies = allCurrencies.slice(4)
+
   const fetchAllPTAX = async () => {
-    if (!selectedDate) return
-    
     setLoading(true)
-    const [yyyy, mm, dd] = selectedDate.split('-')
-    const dataParam = `${mm}-${dd}-${yyyy}`
-    
+    setError(null)
     try {
-      const promises = mainCurrencies.map(async (currency) => {
-        try {
-          const response = await fetch(`/api/ptax?moeda=${currency.code}&data=${dataParam}`)
-          const data = await response.json()
-          return { code: currency.code, ...data }
-        } catch (error) {
-          return { code: currency.code, cotacao: null, error: true }
-        }
+      const [yyyy, mm, dd] = selectedDate.split('-')
+      const dataParam = `${mm}-${dd}-${yyyy}`
+      const promises = allCurrencies.map(async (currency) => {
+        const result = await getPtaxRate(currency.code, dataParam)
+        return { code: currency.code, ...result }
       })
-      
       const results = await Promise.all(promises)
-      const ptaxMap = {}
-      results.forEach(result => {
-        ptaxMap[result.code] = result
-      })
-      
-      setPtaxData(ptaxMap)
+      const newPtaxData = {}
+      results.forEach(result => { newPtaxData[result.code] = result })
+      setPtaxData(newPtaxData)
       setLastUpdate(new Date())
-    } catch (error) {
-      console.error('Erro ao buscar PTAX:', error)
+    } catch (err) {
+      setError('Erro ao buscar cotações do Banco Central')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (selectedDate) {
-      fetchAllPTAX()
-    }
+    if (selectedDate) fetchAllPTAX()
   }, [selectedDate])
 
-  const getTrendIcon = (currencyCode) => {
-    // Simulação de tendência (em produção, você compararia com dados anteriores)
-    const random = Math.random()
-    if (random > 0.6) return <TrendingUp className="w-4 h-4 text-green-500" />
-    if (random > 0.3) return <TrendingDown className="w-4 h-4 text-red-500" />
-    return <div className="w-4 h-4 border-l-2 border-gray-400 transform rotate-45"></div>
+  const handleCurrencyClick = (currencyCode) => {
+    const currencyData = ptaxData[currencyCode]
+    if (currencyData && currencyData.cotacao) {
+      onCurrencySelect(currencyCode, currencyData.cotacao)
+    }
   }
 
   const formatCurrency = (value) => {
     if (!value) return 'N/A'
     return new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 4
     }).format(value)
   }
 
-  const formatDate = (dateString) => {
-    if (!dateString) return ''
-    const [mm, dd, yyyy] = dateString.split('-')
-    return `${dd}/${mm}/${yyyy}`
+  const CurrencyCard = ({ currency, isMain = false }) => {
+    const currencyData = ptaxData[currency.code]
+    const isSelected = selectedCurrency === currency.code
+    const hasData = currencyData && currencyData.cotacao
+    
+    return (
+      <button
+        onClick={() => handleCurrencyClick(currency.code)}
+        disabled={!hasData || loading}
+        className={`p-2 rounded-lg border transition-all ${
+          isSelected
+            ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-md'
+            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:shadow-sm'
+        } ${!hasData ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center space-x-1">
+            <currency.icon className={`w-3 h-3 ${isMain ? 'text-blue-600' : 'text-gray-600 dark:text-gray-400'}`} />
+            <span className={`text-xs font-medium ${isMain ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-white'}`}>
+              {currency.code}
+            </span>
+          </div>
+          {isSelected && <CheckCircle className="w-3 h-3 text-green-600" />}
+        </div>
+        <div className="text-left">
+          <div className={`font-bold ${isMain ? 'text-sm' : 'text-xs'} text-gray-900 dark:text-white`}>
+            {hasData ? formatCurrency(currencyData.cotacao) : 'N/A'}
+          </div>
+          {isMain && hasData && (
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {currencyData.dataCotacao}
+            </div>
+          )}
+        </div>
+      </button>
+    )
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-white/20 p-2 rounded-lg">
-              <DollarSign className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white">Cotações PTAX</h3>
-              <p className="text-blue-100 text-sm">
-                {selectedDate ? `Data: ${formatDate(selectedDate.split('-').reverse().join('-'))}` : 'Selecione uma data'}
-              </p>
-            </div>
-          </div>
+    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800 p-3 shadow-sm">
+      {/* Header minimizado */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-2">
+          <Globe className="w-4 h-4 text-blue-600" />
+          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+            💱 Cotações PTAX - Banco Central
+          </h3>
+        </div>
+        <div className="flex items-center space-x-2">
           <button
             onClick={fetchAllPTAX}
-            disabled={loading || !selectedDate}
-            className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors disabled:opacity-50"
+            disabled={loading}
+            className="flex items-center space-x-1 px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span className="text-sm font-medium">Atualizar</span>
+            {loading ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3 h-3" />
+            )}
+            <span>Atualizar</span>
+          </button>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-800 rounded transition-colors"
+          >
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-6">
-        {!selectedDate ? (
-          <div className="text-center py-8">
-            <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">
-              Selecione uma data para visualizar as cotações PTAX
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Main Currencies Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {mainCurrencies.map((currency) => {
-                const data = ptaxData[currency.code]
-                const isSelected = selectedCurrency === currency.code
-                const IconComponent = currency.icon
-                
-                return (
-                  <div
-                    key={currency.code}
-                    onClick={() => onCurrencySelect(currency.code, data?.cotacao)}
-                    className={`
-                      relative p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md
-                      ${isSelected 
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                        : `${currency.borderColor} ${currency.bgColor} dark:bg-gray-700 dark:border-gray-600`
-                      }
-                      ${data?.error ? 'opacity-60' : ''}
-                    `}
-                  >
-                    {/* Selection Indicator */}
-                    {isSelected && (
-                      <div className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className={`p-2 rounded-lg ${currency.color} bg-white/50`}>
-                          <IconComponent className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-gray-900 dark:text-white">
-                            {currency.code}
-                          </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {currency.name}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="text-right">
-                        {data?.error ? (
-                          <div className="text-red-500 text-sm">Erro</div>
-                        ) : data?.cotacao ? (
-                          <>
-                            <div className="text-lg font-bold text-gray-900 dark:text-white">
-                              R$ {formatCurrency(data.cotacao)}
-                            </div>
-                            <div className="flex items-center justify-end space-x-1 mt-1">
-                              {getTrendIcon(currency.code)}
-                              <span className="text-xs text-gray-500">
-                                {data.dataCotacao ? formatDate(data.dataCotacao) : 'Hoje'}
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-gray-400 text-sm">
-                            {loading ? 'Carregando...' : 'N/A'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Additional Info */}
-            {lastUpdate && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                  <span>Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}</span>
-                  <span>Fonte: Banco Central do Brasil</span>
-                </div>
-              </div>
-            )}
-
-            {/* Quick Actions */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                onClick={() => onCurrencySelect('USD', ptaxData.USD?.cotacao)}
-                className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm hover:bg-green-200 transition-colors"
-              >
-                Usar USD
-              </button>
-              <button
-                onClick={() => onCurrencySelect('EUR', ptaxData.EUR?.cotacao)}
-                className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200 transition-colors"
-              >
-                Usar EUR
-              </button>
-              <button
-                onClick={() => onCurrencySelect('GBP', ptaxData.GBP?.cotacao)}
-                className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm hover:bg-purple-200 transition-colors"
-              >
-                Usar GBP
-              </button>
-            </div>
-          </div>
-        )}
+      {/* Moedas principais sempre visíveis */}
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        {mainCurrencies.map((currency) => (
+          <CurrencyCard key={currency.code} currency={currency} isMain={true} />
+        ))}
       </div>
+
+      {/* Moedas secundárias (expandível) */}
+      {isExpanded && (
+        <div className="border-t border-blue-200 dark:border-blue-700 pt-3">
+          <div className="grid grid-cols-3 gap-2">
+            {secondaryCurrencies.map((currency) => (
+              <CurrencyCard key={currency.code} currency={currency} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Status e erro */}
+      {error && (
+        <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-xs">
+          <div className="flex items-center space-x-1">
+            <AlertTriangle className="w-3 h-3 text-red-600" />
+            <span className="text-red-700 dark:text-red-300">{error}</span>
+          </div>
+        </div>
+      )}
+
+      {lastUpdate && (
+        <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 text-center">
+          Última atualização: {lastUpdate.toLocaleTimeString('pt-BR')}
+        </div>
+      )}
     </div>
   )
 }

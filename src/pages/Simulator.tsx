@@ -274,7 +274,7 @@ const Simulator: React.FC = () => {
             <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Valor Total</div>
             <div className="text-sm font-semibold text-gray-900 dark:text-white">
               {formData.produtos ? 
-              formData.produtos.reduce((acc, p) => acc + (p.quantidade * p.valorUnitario), 0).toFixed(2) : 
+          formData.produtos.reduce((acc, p) => acc + (p.quantidade * p.valorUnitario), 0).toFixed(2) : 
               '0.00'} {formData.moeda}
             </div>
           </div>
@@ -412,7 +412,7 @@ const Simulator: React.FC = () => {
                 <h4 className="font-semibold mb-2">💰 Etapa Valores</h4>
                 <p>Informe os valores FOB, frete internacional, seguro e outros custos relacionados à operação.</p>
               </div>
-              <div>
+      <div>
                 <h4 className="font-semibold mb-2">🚢 Etapa Logística</h4>
                 <p>Configure as informações de transporte, armazenagem e distribuição dos produtos.</p>
               </div>
@@ -436,7 +436,7 @@ const Simulator: React.FC = () => {
               style={{ width: `${progressPercentage}%` }}
             ></div>
           </div>
-        </div>
+      </div>
 
         {/* Tabs Navigation */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
@@ -448,8 +448,8 @@ const Simulator: React.FC = () => {
               
               return (
                 <Tooltip key={tab.id} content={tab.description}>
-                  <button
-                    onClick={() => essenciaisPreenchidos || tab.id === 'essenciais' ? setActiveTab(tab.id) : null}
+          <button
+            onClick={() => essenciaisPreenchidos || tab.id === 'essenciais' ? setActiveTab(tab.id) : null}
                     disabled={isDisabled}
                     className={`flex items-center px-4 py-3 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                       isActive
@@ -473,42 +473,42 @@ const Simulator: React.FC = () => {
                     </span>
                     <span className="hidden sm:inline">{tab.label}</span>
                     <span className="sm:hidden">{tab.icon}</span>
-                  </button>
+          </button>
                 </Tooltip>
               )
             })}
           </div>
-        </div>
+      </div>
 
-        {/* Painel de resumo visível em todas as etapas (exceto Essenciais) */}
-        {activeTab !== 'essenciais' && <Resumo />}
+      {/* Painel de resumo visível em todas as etapas (exceto Essenciais) */}
+      {activeTab !== 'essenciais' && <Resumo />}
 
-        {/* Tab Content */}
+      {/* Tab Content */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          {activeTab === 'essenciais' && (
-            <EssenciaisTab data={formData} onChange={updateFormData} onNext={nextTab} />
-          )}
-          {activeTab === 'produto' && (
-            <ProdutoTab data={formData} onChange={updateFormData} onNext={nextTab} />
-          )}
-          {activeTab === 'valores' && (
-            <ValoresTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
-          )}
-          {activeTab === 'aduana' && (
-            <AduanaTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
-          )}
-          {activeTab === 'tributos' && (
-            <TributosTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
-          )}
-          {activeTab === 'incentivos' && (
-            <IncentivosTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
-          )}
-          {activeTab === 'licencas' && (
-            <LicencasTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
-          )}
-          {activeTab === 'resultados' && (
-            <ResultadosTab data={formData} calculation={calculation} onPrev={prevTab} />
-          )}
+      {activeTab === 'essenciais' && (
+        <EssenciaisTab data={formData} onChange={updateFormData} onNext={nextTab} />
+      )}
+      {activeTab === 'produto' && (
+        <ProdutoTab data={formData} onChange={updateFormData} onNext={nextTab} />
+      )}
+      {activeTab === 'valores' && (
+        <ValoresTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
+      )}
+      {activeTab === 'aduana' && (
+        <AduanaTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
+      )}
+      {activeTab === 'tributos' && (
+        <TributosTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
+      )}
+      {activeTab === 'incentivos' && (
+        <IncentivosTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
+      )}
+      {activeTab === 'licencas' && (
+        <LicencasTab data={formData} onChange={updateFormData} onNext={nextTab} onPrev={prevTab} />
+      )}
+      {activeTab === 'resultados' && (
+        <ResultadosTab data={formData} calculation={calculation} onPrev={prevTab} />
+      )}
         </div>
       </div>
     </div>

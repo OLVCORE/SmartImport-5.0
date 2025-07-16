@@ -1,4 +1,15 @@
-import React, { useState, useEffect } from 'react'
+import { writeFileSync, readFileSync } from 'fs'
+import { join } from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+console.log('🔧 Forçando atualização do Sidebar...')
+
+// Forçar atualização do Sidebar.tsx com timestamp
+const sidebarContent = `import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { 
   LayoutDashboard, 
@@ -36,7 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
     console.log('🎯 Sidebar renderizado com todos os itens:', navigation.length)
   }, [])
 
-  // Navegação completa com todos os módulos - ATUALIZADO 2025-07-15T20:28:17.398Z
+  // Navegação completa com todos os módulos - ATUALIZADO ${new Date().toISOString()}
   const navigation = [
     { 
       name: 'Dashboard', 
@@ -114,11 +125,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
         <div className="lg:hidden fixed inset-0 z-40 bg-gray-600 bg-opacity-75" onClick={onClose} />
       )}
       {/* Sidebar */}
-      <div className={`w-64 h-full bg-white dark:bg-gray-800 shadow-lg
-        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      <div className={\`w-64 h-full bg-white dark:bg-gray-800 shadow-lg
+        \${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         border-r border-gray-200 dark:border-gray-700
         lg:relative lg:transform-none
-        ${isOpen ? 'fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out' : 'lg:static'}`}
+        \${isOpen ? 'fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out' : 'lg:static'}\`}
       >
         {/* Header do Sidebar */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
@@ -153,19 +164,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
               const active = isActive(item.href)
               return (
                 <button
-                  key={`${item.name}-${index}`}
+                  key={\`\${item.name}-\${index}\`}
                   onClick={() => {
                     console.log('🎯 Navegando para:', item.href)
                     if (onClose) onClose()
                     navigate(item.href)
                   }}
-                  className={`group flex items-center w-full px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer ${active
+                  className={\`group flex items-center w-full px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer \${active
                     ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
-                  }`}
+                  }\`}
                   title={item.description}
                 >
-                  <Icon className={`mr-3 h-5 w-5 flex-shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-200'}`} />
+                  <Icon className={\`mr-3 h-5 w-5 flex-shrink-0 \${active ? 'text-white' : 'text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-200'}\`} />
                   {!isCollapsed && (
                     <span className="flex-1 text-left">{item.name}</span>
                   )}
@@ -212,4 +223,23 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
   )
 }
 
-export default Sidebar
+export default Sidebar`
+
+// Escrever o novo Sidebar
+const sidebarPath = join(__dirname, '..', 'src', 'components', 'Layout', 'Sidebar.tsx')
+writeFileSync(sidebarPath, sidebarContent)
+
+console.log('✅ Sidebar atualizado com força!')
+console.log('📋 Itens no sidebar:')
+console.log('1. Dashboard')
+console.log('2. Simulador')
+console.log('3. Histórico')
+console.log('4. Relatórios')
+console.log('5. SmartFrete')
+console.log('6. SeaFrete')
+console.log('7. OPN IA')
+console.log('8. Integrações')
+console.log('9. Configurações')
+console.log('10. Ajuda')
+console.log('\\n Total: 10 itens')
+console.log('\\n🔄 Próximo passo: Reiniciar o frontend') 

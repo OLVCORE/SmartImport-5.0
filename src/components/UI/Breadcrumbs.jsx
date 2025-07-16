@@ -12,8 +12,10 @@ const Breadcrumbs = () => {
     '/history': 'Histórico',
     '/reports': 'Relatórios',
     '/integrations': 'Integrações',
+    '/opnia': 'OPN IA',
     '/settings': 'Configurações',
-    '/help': 'Ajuda'
+    '/help': 'Ajuda',
+    '/smartfrete': 'SmartFrete'
   }
 
   const generateBreadcrumbs = () => {
@@ -41,26 +43,19 @@ const Breadcrumbs = () => {
   if (breadcrumbs.length <= 1) return null
 
   return (
-    <nav className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+    <nav className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
       {breadcrumbs.map((breadcrumb, index) => (
         <React.Fragment key={breadcrumb.path}>
-          {index > 0 && (
-            <ChevronRight className="w-4 h-4 text-gray-400" />
-          )}
-          {breadcrumb.isLast ? (
-            <span className="font-medium text-gray-900 dark:text-white">
-              {breadcrumb.icon && <span className="inline-block mr-1">{breadcrumb.icon}</span>}
-              {breadcrumb.name}
-            </span>
-          ) : (
-            <Link
-              to={breadcrumb.path}
-              className="hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"
-            >
-              {breadcrumb.icon && <span className="inline-block">{breadcrumb.icon}</span>}
-              {breadcrumb.name}
-            </Link>
-          )}
+          {index > 0 && <ChevronRight className="w-4 h-4" />}
+          <Link
+            to={breadcrumb.path}
+            className={`flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-300 transition-colors ${
+              breadcrumb.isLast ? 'text-gray-900 dark:text-white font-medium' : ''
+            }`}
+          >
+            {breadcrumb.icon && breadcrumb.icon}
+            <span>{breadcrumb.name}</span>
+          </Link>
         </React.Fragment>
       ))}
     </nav>

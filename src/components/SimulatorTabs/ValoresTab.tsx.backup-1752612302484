@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { validateRequiredFields, showValidationAlert, convertToBRL, formatDualCurrency, fetchPTAXRate } from '../../utils/currency'
 
 interface ValoresTabProps {
@@ -22,56 +22,53 @@ const ValoresTab: React.FC<ValoresTabProps> = ({ data, onChange, onNext, onPrev 
   // Campos obrigatórios para esta aba
   const requiredFields = ['valorFob', 'frete', 'seguro']
 
-  // Função memoizada para buscar PTAX
-  const fetchPtax = useCallback(async (moeda: string) => {
-    if (!moeda || moeda === 'BRL') {
-      setPtaxInfo({ cotacao: 1.0, dataCotacao: new Date().toISOString().slice(0, 10), fonte: 'PTAX Banco Central' })
-      return
-    }
-
-    setLoadingPtax(true)
-    try {
-      const ptaxData = await fetchPTAXRate(moeda)
-      setPtaxInfo(ptaxData)
-    } catch (error) {
-      console.error(`❌ Erro ao carregar PTAX:`, error)
-      setPtaxInfo({ cotacao: 1.0, dataCotacao: 'N/A', fonte: 'Erro ao carregar' })
-    } finally {
-      setLoadingPtax(false)
-    }
-  }, [])
-
-  // Função memoizada para calcular valores BRL
-  const calculateBrlValues = useCallback(async () => {
-    const currency = data.moeda || 'USD'
-    const valorFob = parseFloat(data.valorFob) || 0
-    const frete = parseFloat(data.frete) || 0
-    const seguro = parseFloat(data.seguro) || 0
-
-    const brlFob = await convertToBRL(valorFob, currency)
-    const brlFrete = await convertToBRL(frete, currency)
-    const brlSeguro = await convertToBRL(seguro, currency)
-    const brlTotal = brlFob + brlFrete + brlSeguro
-
-    setBrlValues({
-      valorFob: brlFob,
-      frete: brlFrete,
-      seguro: brlSeguro,
-      totalCif: brlTotal
-    })
-  }, [data.valorFob, data.frete, data.seguro, data.moeda])
-
-  // useEffect único para PTAX
+  // Buscar PTAX quando moeda mudar
   useEffect(() => {
-    if (data.moeda) {
-      fetchPtax(data.moeda)
-    }
-  }, [data.moeda, fetchPtax])
+    const fetchPtax = async () => {
+      if (!data.moeda || data.moeda === 'BRL') {
+        setPtaxInfo({ cotacao: 1.0, dataCotacao: new Date().toISOString().slice(0, 10), fonte: 'PTAX Banco Central' })
+        return
+      }
 
-  // useEffect único para cálculos BRL
+      setLoadingPtax(true)
+      try {
+        const ptaxData = await fetchPTAXRate(data.moeda)
+        setPtaxInfo(ptaxData)
+        console.log(`✅ PTAX carregado para ${data.moeda}:`, ptaxData)
+      } catch (error) {
+        console.error(`❌ Erro ao carregar PTAX:`, error)
+        setPtaxInfo({ cotacao: 1.0, dataCotacao: 'N/A', fonte: 'Erro ao carregar' })
+      } finally {
+        setLoadingPtax(false)
+      }
+    }
+
+    fetchPtax()
+  }, [data.moeda])
+
+  // Calcular valores em BRL quando moeda ou valores mudarem
   useEffect(() => {
+    const calculateBrlValues = async () => {
+      const currency = data.moeda || 'USD'
+      const valorFob = parseFloat(data.valorFob) || 0
+      const frete = parseFloat(data.frete) || 0
+      const seguro = parseFloat(data.seguro) || 0
+
+      const brlFob = await convertToBRL(valorFob, currency)
+      const brlFrete = await convertToBRL(frete, currency)
+      const brlSeguro = await convertToBRL(seguro, currency)
+      const brlTotal = brlFob + brlFrete + brlSeguro
+
+      setBrlValues({
+        valorFob: brlFob,
+        frete: brlFrete,
+        seguro: brlSeguro,
+        totalCif: brlTotal
+      })
+    }
+
     calculateBrlValues()
-  }, [calculateBrlValues])
+  }, [data.valorFob, data.frete, data.seguro, data.moeda])
 
   // Validar campos antes de prosseguir
   const handleNext = () => {

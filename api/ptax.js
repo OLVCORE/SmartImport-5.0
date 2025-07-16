@@ -1,4 +1,4 @@
-// PTAX API - Versão que funciona com Banco Central real
+// PTAX API - CORREÇÃO DEFINITIVA - Formato de data correto
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido' })
@@ -10,20 +10,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Verificar se é data futura
+    // CORREÇÃO: Converter formato MM-DD-YYYY para DD-MM-YYYY (formato do Banco Central)
     const [mm, dd, yyyy] = data.split('-')
+    const dataCorrigida = `${dd}-${mm}-${yyyy}` // Formato correto para Banco Central
+    
+    // Verificar se é data futura
     const dataSolicitada = new Date(yyyy, mm - 1, dd)
     const hoje = new Date()
     hoje.setHours(0, 0, 0, 0)
     
     // Se for data futura, usar data de hoje
-    let dataBusca = data
+    let dataBusca = dataCorrigida
     if (dataSolicitada > hoje) {
       const hojeFormatado = new Date()
       const mmHoje = String(hojeFormatado.getMonth() + 1).padStart(2, '0')
       const ddHoje = String(hojeFormatado.getDate()).padStart(2, '0')
       const yyyyHoje = hojeFormatado.getFullYear()
-      dataBusca = `${mmHoje}-${ddHoje}-${yyyyHoje}`
+      dataBusca = `${ddHoje}-${mmHoje}-${yyyyHoje}` // Formato correto
       console.log('Data futura detectada, usando data de hoje:', dataBusca)
     }
     
@@ -32,8 +35,8 @@ export default async function handler(req, res) {
     let dataCotacao = null
     
     while (tentativas < 7) {
-      const [mm, dd, yyyy] = dataBusca.split('-')
-      const dataISO = `${yyyy}-${mm}-${dd}`
+      const [dd, mm, yyyy] = dataBusca.split('-')
+      const dataISO = `${yyyy}-${mm}-${dd}` // Formato ISO para API
       
       const url = `https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoMoedaDia(moeda='${moeda}',dataCotacao='${dataISO}')?$format=json`
       
@@ -47,7 +50,7 @@ export default async function handler(req, res) {
           if (json.value && json.value.length > 0) {
             cotacao = parseFloat(json.value[0].cotacaoVenda)
             dataCotacao = dataISO
-            console.log('PTAX encontrado:', cotacao, 'para', moeda)
+            console.log('✅ PTAX encontrado:', cotacao, 'para', moeda)
             break
           }
         }
@@ -60,7 +63,7 @@ export default async function handler(req, res) {
       const mmAnterior = String(dataAnterior.getMonth() + 1).padStart(2, '0')
       const ddAnterior = String(dataAnterior.getDate()).padStart(2, '0')
       const yyyyAnterior = dataAnterior.getFullYear()
-      dataBusca = `${mmAnterior}-${ddAnterior}-${yyyyAnterior}`
+      dataBusca = `${ddAnterior}-${mmAnterior}-${yyyyAnterior}` // Formato correto
       tentativas++
     }
     

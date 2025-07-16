@@ -159,6 +159,11 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
       setPtaxMode('manual')
       onChange({ ...data, ptax: valor })
       console.log('✅ PTAX manual aplicado:', valor)
+      
+      // Forçar atualização do estado
+      setTimeout(() => {
+        onChange({ ...data, ptax: valor })
+      }, 100)
     } else {
       alert('Por favor, insira um valor válido para o PTAX (ex: 5,50 ou 5.50)')
     }

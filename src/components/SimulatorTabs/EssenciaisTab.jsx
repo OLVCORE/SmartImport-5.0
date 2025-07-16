@@ -15,6 +15,7 @@ import { useUser } from '../../contexts/UserContext';
 import { FaCrown, FaEye } from 'react-icons/fa';
 import { fetchPTAXRate } from '../../utils/currency'
 import PTAXPanel from '../UI/PTAXPanel'
+import { getPtaxRateWithFallback } from '../../services/ptaxService.js'
 
 const modais = [
   { value: 'maritimo', label: 'Marítimo', description: 'Transporte por navio - ideal para grandes volumes' },
@@ -949,7 +950,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     setShowPTAXPanel(false)
   }
 
-  // Função para buscar cotação PTAX
+  // Função para buscar cotação PTAX - ATUALIZADA
   const buscarCotacao = async () => {
     if (!data.moeda || !ptaxDate) return
     
@@ -958,16 +959,30 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     try {
       const [yyyy, mm, dd] = ptaxDate.split('-')
       const dataParam = `${mm}-${dd}-${yyyy}`
-      const { cotacao, dataCotacao, fonte } = await fetchPTAXRate(data.moeda, dataParam)
-      setPtax(cotacao)
-      setPtaxInfo({ dataCotacao, fonte })
+      
+      console.log(`🔍 Buscando PTAX: ${data.moeda} para ${dataParam}`)
+      
+      const resultado = await getPtaxRateWithFallback(data.moeda, dataParam)
+      
+      setPtax(resultado.cotacao)
+      setPtaxInfo({ dataCotacao: resultado.dataCotacao, fonte: resultado.fonte })
       setPtaxEditable(false)
-      onChange({ ...data, ptax: cotacao })
+      onChange({ ...data, ptax: resultado.cotacao })
+      
+      console.log(`✅ PTAX aplicado:`, resultado)
     } catch (err) {
       setPtax('')
       setPtaxInfo({ dataCotacao: '', fonte: '' })
-      alert('Erro ao buscar PTAX do Banco Central. Verifique sua conexão ou tente novamente mais tarde.')
-      console.error('Erro ao buscar PTAX:', err)
+      console.error('❌ Erro ao buscar PTAX:', err)
+      
+      // Se for data futura, permitir entrada manual
+      if (isFutureDate(ptaxDate)) {
+        setPtaxMode('manual')
+        setPtaxManualValue('')
+        alert('Data futura detectada. Use o modo manual para inserir PTAX.')
+      } else {
+        alert('Erro ao buscar PTAX do Banco Central. Verifique sua conexão ou tente novamente mais tarde.')
+      }
     } finally {
       setLoadingPtax(false)
     }
@@ -976,38 +991,48 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   // Buscar PTAX do dia automaticamente ao selecionar moeda ou ao abrir a tela
   useEffect(() => {
     if (!data.moeda || !ptaxDate || ptaxManual) return
+    
     const [yyyy, mm, dd] = ptaxDate.split('-')
     const dataParam = `${mm}-${dd}-${yyyy}`
-    fetchPTAXRate(data.moeda, dataParam)
-      .then(({ cotacao, dataCotacao, fonte }) => {
-        setPtax(cotacao)
-        setPtaxInfo({ dataCotacao, fonte })
-        onChange({ ...data, ptax: cotacao })
+    
+    getPtaxRateWithFallback(data.moeda, dataParam)
+      .then((resultado) => {
+        setPtax(resultado.cotacao)
+        setPtaxInfo({ dataCotacao: resultado.dataCotacao, fonte: resultado.fonte })
+        onChange({ ...data, ptax: resultado.cotacao })
+        console.log(`✅ PTAX automático aplicado:`, resultado)
       })
       .catch((err) => {
         setPtax('')
         setPtaxInfo({ dataCotacao: '', fonte: '' })
-        alert('Erro ao buscar PTAX do Banco Central. Verifique sua conexão ou tente novamente mais tarde.')
-        console.error('Erro ao buscar PTAX:', err)
+        console.error('❌ Erro PTAX automático:', err)
+        
+        if (isFutureDate(ptaxDate)) {
+          setPtaxMode('manual')
+          setPtaxManualValue('')
+        }
       })
   }, [data.moeda, ptaxDate, ptaxManual])
 
-  // Função para buscar cotação manualmente (botão)
+  // Função para buscar cotação manualmente (botão) - ATUALIZADA
   const buscarCotacaoManual = async () => {
     if (!data.moeda || !ptaxDate) return
+    
     const [yyyy, mm, dd] = ptaxDate.split('-')
     const dataParam = `${mm}-${dd}-${yyyy}`
+    
     try {
-      const { cotacao, dataCotacao, fonte } = await fetchPTAXRate(data.moeda, dataParam)
-      setPtax(cotacao)
-      setPtaxInfo({ dataCotacao, fonte })
+      const resultado = await getPtaxRateWithFallback(data.moeda, dataParam)
+      setPtax(resultado.cotacao)
+      setPtaxInfo({ dataCotacao: resultado.dataCotacao, fonte: resultado.fonte })
       setPtaxManual(false) // volta ao modo automático
-      onChange({ ...data, ptax: cotacao })
+      onChange({ ...data, ptax: resultado.cotacao })
+      console.log(`✅ PTAX manual aplicado:`, resultado)
     } catch (err) {
       setPtax('')
       setPtaxInfo({ dataCotacao: '', fonte: '' })
+      console.error('❌ Erro PTAX manual:', err)
       alert('Erro ao buscar PTAX do Banco Central. Verifique sua conexão ou tente novamente mais tarde.')
-      console.error('Erro ao buscar PTAX:', err)
     }
   }
 
@@ -1035,7 +1060,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     }
   }
 
-  // Função para buscar PTAX com data específica
+  // Função para buscar PTAX com data específica - ATUALIZADA
   const buscarCotacaoComData = async (dataEspecifica) => {
     if (!data.moeda || !dataEspecifica) return
     
@@ -1044,15 +1069,17 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     try {
       const [yyyy, mm, dd] = dataEspecifica.split('-')
       const dataParam = `${mm}-${dd}-${yyyy}`
-      const { cotacao, dataCotacao, fonte } = await fetchPTAXRate(data.moeda, dataParam)
-      setPtax(cotacao)
-      setPtaxInfo({ dataCotacao, fonte })
+      
+      const resultado = await getPtaxRateWithFallback(data.moeda, dataParam)
+      setPtax(resultado.cotacao)
+      setPtaxInfo({ dataCotacao: resultado.dataCotacao, fonte: resultado.fonte })
       setPtaxEditable(false)
-      onChange({ ...data, ptax: cotacao })
+      onChange({ ...data, ptax: resultado.cotacao })
+      console.log(`✅ PTAX com data aplicado:`, resultado)
     } catch (err) {
       setPtax('')
       setPtaxInfo({ dataCotacao: '', fonte: '' })
-      console.error('Erro ao buscar PTAX:', err)
+      console.error('❌ Erro PTAX com data:', err)
     } finally {
       setLoadingPtax(false)
     }

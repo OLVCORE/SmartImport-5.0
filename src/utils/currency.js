@@ -31,53 +31,19 @@ const CURRENCY_CONFIGS = {
 /**
  * Busca taxa PTAX atual do Banco Central
  * @param {string} currency - Código da moeda
- * @param {string} date - Data no formato 'MM-DD-YYYY' (opcional, default hoje)
+ * @param {string} date - Data no formato 'MM-DD-YYYY'
  * @returns {Promise<{cotacao: number, dataCotacao: string, fonte: string}>}
  */
 export const fetchPTAXRate = async (currency = 'USD', date) => {
-  if (currency === 'BRL') {
-    // Para BRL, a cotação é sempre 1.0, data de hoje, fonte fixa
-    return {
-      cotacao: 1.0,
-      dataCotacao: new Date().toISOString().slice(0, 10),
-      fonte: 'PTAX Banco Central'
-    }
-  }
+  // Importar o serviço unificado
+  const { getPtaxRateWithFallback } = await import('../services/ptaxService.js')
   
   try {
-    // Se não passar data, usa hoje
-    let dataParam = date
-    if (!dataParam) {
-      const now = new Date()
-      const mm = String(now.getMonth() + 1).padStart(2, '0')
-      const dd = String(now.getDate()).padStart(2, '0')
-      const yyyy = now.getFullYear()
-      dataParam = `${mm}-${dd}-${yyyy}`
-    }
-    
-    console.log(' Buscando PTAX:', { currency, dataParam })
-    
-    const res = await fetch(`/api/ptax?moeda=${currency}&data=${dataParam}`)
-    if (!res.ok) {
-      console.error('❌ PTAX API não respondeu')
-      throw new Error(`PTAX API error: ${res.status} - ${res.statusText}`)
-    }
-    
-    const json = await res.json()
-    console.log('✅ PTAX obtido:', json)
-    
-    if (!json.cotacao || json.cotacao === null) {
-      throw new Error('Cotação não disponível no Banco Central')
-    }
-    
-    return {
-      cotacao: json.cotacao,
-      dataCotacao: json.dataCotacao || dataParam,
-      fonte: json.fonte || 'PTAX Banco Central'
-    }
+    const resultado = await getPtaxRateWithFallback(currency, date)
+    return resultado
   } catch (error) {
-    console.error('❌ Erro ao buscar PTAX:', error)
-    throw new Error(`Erro ao buscar cotação PTAX: ${error.message}`)
+    console.error('❌ Erro fetchPTAXRate:', error)
+    throw error
   }
 }
 
@@ -85,12 +51,13 @@ export const fetchPTAXRate = async (currency = 'USD', date) => {
  * Converte valor para BRL usando PTAX
  * @param {number} value - Valor a ser convertido
  * @param {string} fromCurrency - Moeda de origem
+ * @param {string} date - Data da cotação
  * @returns {Promise<number>} Valor em BRL
  */
-export const convertToBRL = async (value, fromCurrency) => {
+export const convertToBRL = async (value, fromCurrency, date) => {
   if (fromCurrency === 'BRL') return value
   
-  const rateData = await fetchPTAXRate(fromCurrency)
+  const rateData = await fetchPTAXRate(fromCurrency, date)
   return value * rateData.cotacao
 }
 
@@ -251,6 +218,7 @@ export const parseNumber = (value) => {
       return parseFloat(cleanValue.replace(',', '.'))
     }
     
+    // Se só tem ponto ou nenhum separador
     return parseFloat(cleanValue)
   }
   

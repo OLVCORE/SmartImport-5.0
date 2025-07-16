@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import toast from 'react-hot-toast'
+import { getPtaxRateWithFallback } from '../services/ptaxService.js'
 
 // Mock data para demonstração
 const mockSimulations = [
@@ -165,6 +166,11 @@ export const useSimulationStore = create(
       isLoading: false,
       error: null,
       
+      // PTAX state
+      ptaxData: {},
+      ptaxLoading: false,
+      ptaxError: null,
+      
       // Customs data
       customsRegimes: mockCustomsRegimes,
       customsLocations: mockCustomsLocations,
@@ -186,6 +192,48 @@ export const useSimulationStore = create(
       setError: (error) => set({ error }),
       
       clearError: () => set({ error: null }),
+
+      // PTAX Actions
+      fetchPtaxRate: async (moeda, data) => {
+        set({ ptaxLoading: true, ptaxError: null })
+        
+        try {
+          const resultado = await getPtaxRateWithFallback(moeda, data)
+          
+          set((state) => ({
+            ptaxData: {
+              ...state.ptaxData,
+              [moeda]: resultado
+            },
+            ptaxLoading: false
+          }))
+          
+          return resultado
+        } catch (error) {
+          set({ 
+            ptaxLoading: false, 
+            ptaxError: error.message 
+          })
+          
+          toast.error(`Erro ao buscar PTAX: ${error.message}`)
+          throw error
+        }
+      },
+
+      updatePtaxInSimulation: (moeda, cotacao, dataCotacao) => {
+        set((state) => {
+          if (!state.currentSimulation) return state
+          
+          return {
+            currentSimulation: {
+              ...state.currentSimulation,
+              moeda,
+              ptax: cotacao,
+              ptaxData: dataCotacao
+            }
+          }
+        })
+      },
 
       // Simulation actions
       createSimulation: (simulationData) => {
@@ -372,13 +420,12 @@ export const useSimulationStore = create(
       }
     }),
     {
-      name: 'smartimport-store',
+      name: 'simulation-store',
       partialize: (state) => ({
         simulations: state.simulations,
+        currentSimulation: state.currentSimulation,
         settings: state.settings,
-        customsRegimes: state.customsRegimes,
-        customsLocations: state.customsLocations,
-        fiscalIncentives: state.fiscalIncentives
+        ptaxData: state.ptaxData
       })
     }
   )

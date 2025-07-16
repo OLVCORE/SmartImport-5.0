@@ -17,6 +17,7 @@ import { fetchPTAXRate } from '../../utils/currency'
 import PTAXPanel from '../UI/PTAXPanel'
 import { getPtaxRateWithFallback, isFutureDate } from '../../services/ptaxService.js'
 import { useSimulationStore } from '../../store/simulationStore'
+import { getPtax } from '../../utils/ptax.js'
 
 const modais = [
   { value: 'maritimo', label: 'Marítimo', description: 'Transporte por navio - ideal para grandes volumes' },
@@ -372,6 +373,21 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
       // Se for data passada/atual e modo automático, buscar PTAX
       buscarCotacaoComData(newDate)
     }
+  }
+
+  // Adicionar função resetProcessamento que estava faltando
+  const resetProcessamento = () => {
+    setProcessingDocument(false)
+    setDocumentText('')
+    setProcessamentoResumo(null)
+    setProgressState({
+      stage: 'extracting',
+      currentChunk: 0,
+      totalChunks: 0,
+      productsFound: 0,
+      documentSize: 0,
+      message: ''
+    })
   }
 
   // ... rest of existing code remains the same ...

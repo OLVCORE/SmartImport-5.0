@@ -131,7 +131,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
 
   // SUA ABORDAGEM: Estados PTAX
   const [ptax, setLocalPtax] = useState(data.ptax || '')
-  const [ptaxDate, setPtaxDate] = useState(() => {
+  const [ptaxDate, setLocalPtaxDate] = useState(() => {
     const now = new Date()
     const yyyy = now.getFullYear()
     const mm = String(now.getMonth() + 1).padStart(2, '0')
@@ -356,7 +356,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     const dd = String(now.getDate()).padStart(2, '0')
     const currentDate = `${yyyy}-${mm}-${dd}`
     
-    setPtaxDate(currentDate)
+    setLocalPtaxDate(currentDate)
     
     // Se estiver em modo automático, buscar PTAX automaticamente
     if (ptaxMode === 'auto' && data.moeda) {
@@ -388,7 +388,7 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
 
   // Função para lidar com mudança de data - ATUALIZADA
   const handleDateChange = (newDate) => {
-    setPtaxDate(newDate)
+    setLocalPtaxDate(newDate)
     
     // Se for data futura, forçar modo manual
     if (isFutureDate(newDate)) {

@@ -1,158 +1,51 @@
-// Serviço PTAX UNIFICADO - ÚNICA FONTE DE VERDADE
-import { subDays, format, parseISO } from 'date-fns'
+// Serviço PTAX com fallback inteligente - SUA ABORDAGEM
+import { format, subBusinessDays } from 'date-fns'
 
-/**
- * Busca PTAX com fallback automático para datas não úteis
- * @param {string} moeda - Código da moeda
- * @param {string} data - Data no formato MM-DD-YYYY ou YYYY-MM-DD
- * @param {number} maxTentativas - Máximo de tentativas (dias anteriores)
- * @returns {Promise<{cotacao: number, dataCotacao: string, fonte: string}>}
- */
-export async function getPtaxRateWithFallback(moeda = 'USD', data, maxTentativas = 7) {
-  if (!moeda || !data) {
-    console.error('❌ Parâmetros inválidos:', { moeda, data })
-    throw new Error('Moeda e data são obrigatórios')
-  }
-
-  // Para BRL, sempre retorna 1.0
+export async function fetchPtax(moeda, dataInput) {
   if (moeda === 'BRL') {
     return {
       cotacao: 1.0,
-      dataCotacao: data,
+      dataCotacao: dataInput,
       fonte: 'PTAX Banco Central'
     }
   }
 
-  let dataAtual = data
-  let tentativas = 0
-
-  while (tentativas < maxTentativas) {
+  // SUA ABORDAGEM: Detectar formato e converter
+  let [yyyy, mm, dd] = dataInput.split('-')
+  if (yyyy.length !== 4) {
+    [dd, mm, yyyy] = dataInput.split('-')
+  }
+  let date = new Date(+yyyy, +mm-1, +dd)
+  
+  // SUA ABORDAGEM: Tentar até 5 dias úteis anteriores
+  for (let i = 0; i < 5; i++) {
+    const d = subBusinessDays(date, i)
+    const iso = format(d, 'yyyy-MM-dd')
+    
     try {
-      console.log(`🔄 Tentativa ${tentativas + 1}: ${moeda} para ${dataAtual}`)
-      
-      const resultado = await fetchPtaxRate(moeda, dataAtual)
-      
-      if (resultado.cotacao) {
-        console.log(`✅ PTAX encontrado na tentativa ${tentativas + 1}:`, resultado)
-        return resultado
+      const res = await fetch(`/api/ptax?moeda=${moeda}&data=${iso}`)
+      if (res.ok) {
+        const result = await res.json()
+        if (result.cotacao) {
+          return result
+        }
       }
     } catch (error) {
-      console.log(`❌ Tentativa ${tentativas + 1} falhou:`, error.message)
+      console.log(`Tentativa ${i + 1} falhou:`, error.message)
     }
-
-    // Tentar dia anterior
-    dataAtual = getPreviousDay(dataAtual)
-    tentativas++
   }
-
-  throw new Error(`PTAX não encontrado após ${maxTentativas} tentativas`)
+  
+  throw new Error('PTAX não disponível')
 }
 
-/**
- * Busca PTAX para uma data específica
- * @param {string} moeda - Código da moeda
- * @param {string} data - Data no formato MM-DD-YYYY ou YYYY-MM-DD
- * @returns {Promise<{cotacao: number, dataCotacao: string, fonte: string}>}
- */
-export async function fetchPtaxRate(moeda, data) {
-  try {
-    console.log(`🔍 fetchPtaxRate: ${moeda} para ${data}`)
-    
-    const response = await fetch(`/api/ptax?moeda=${moeda}&data=${data}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(`HTTP ${response.status}: ${errorData.error || response.statusText}`)
-    }
-
-    const result = await response.json()
-    
-    if (!result.cotacao) {
-      throw new Error('Cotação não disponível')
-    }
-
-    console.log(`✅ fetchPtaxRate sucesso:`, result)
-    return {
-      cotacao: parseFloat(result.cotacao),
-      dataCotacao: result.dataCotacao,
-      fonte: result.fonte || 'PTAX Banco Central'
-    }
-
-  } catch (error) {
-    console.error(`❌ fetchPtaxRate erro:`, error.message)
-    throw error
+// Função para verificar se data é futura
+export function isFutureDate(dataInput) {
+  let [yyyy, mm, dd] = dataInput.split('-')
+  if (yyyy.length !== 4) {
+    [dd, mm, yyyy] = dataInput.split('-')
   }
-}
-
-/**
- * Obtém o dia anterior em formato MM-DD-YYYY
- * @param {string} data - Data no formato MM-DD-YYYY ou YYYY-MM-DD
- * @returns {string} Data anterior
- */
-function getPreviousDay(data) {
-  let dataISO
-  
-  // Detectar formato
-  if (data.includes('-')) {
-    const parts = data.split('-')
-    if (parts[0].length === 4) {
-      // YYYY-MM-DD
-      dataISO = data
-    } else if (parts[0].length === 2) {
-      // MM-DD-YYYY ou DD-MM-YYYY
-      if (parseInt(parts[0]) > 12) {
-        // DD-MM-YYYY
-        const [dd, mm, yyyy] = parts
-        dataISO = `${yyyy}-${mm}-${dd}`
-      } else {
-        // MM-DD-YYYY
-        const [mm, dd, yyyy] = parts
-        dataISO = `${yyyy}-${mm}-${dd}`
-      }
-    }
-  }
-  
-  // Calcular dia anterior
-  const dataAnterior = subDays(parseISO(dataISO), 1)
-  const mmAnterior = String(dataAnterior.getMonth() + 1).padStart(2, '0')
-  const ddAnterior = String(dataAnterior.getDate()).padStart(2, '0')
-  const yyyyAnterior = dataAnterior.getFullYear()
-  
-  return `${mmAnterior}-${ddAnterior}-${yyyyAnterior}`
-}
-
-/**
- * Verifica se uma data é futura
- * @param {string} data - Data no formato MM-DD-YYYY ou YYYY-MM-DD
- * @returns {boolean} True se for futura
- */
-export function isFutureDate(data) {
-  let dataISO
-  
-  // Detectar formato
-  if (data.includes('-')) {
-    const parts = data.split('-')
-    if (parts[0].length === 4) {
-      dataISO = data
-    } else if (parts[0].length === 2) {
-      if (parseInt(parts[0]) > 12) {
-        const [dd, mm, yyyy] = parts
-        dataISO = `${yyyy}-${mm}-${dd}`
-      } else {
-        const [mm, dd, yyyy] = parts
-        dataISO = `${yyyy}-${mm}-${dd}`
-      }
-    }
-  }
-  
-  const selectedDate = parseISO(dataISO)
+  const selectedDate = new Date(+yyyy, +mm-1, +dd)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  
   return selectedDate > today
 } 

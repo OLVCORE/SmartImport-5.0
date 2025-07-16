@@ -1,4 +1,4 @@
-// PTAX API - Versão real sem mocks
+// PTAX API - Versão corrigida sem conflitos de variáveis
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido' })
@@ -10,10 +10,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Formato esperado pelo Bacen: AAAA-MM-DD
-    const [mm, dd, yyyy] = data.split('-')
-    const dataISO = `${yyyy}-${mm}-${dd}`
-    
     let dataBusca = data
     let tentativas = 0
     let cotacao = null
@@ -44,7 +40,6 @@ export default async function handler(req, res) {
       }
       
       // Tenta o dia anterior
-      const [mm, dd, yyyy] = dataBusca.split('-')
       const dataAnterior = new Date(yyyy, mm - 1, dd - 1)
       const mmAnterior = String(dataAnterior.getMonth() + 1).padStart(2, '0')
       const ddAnterior = String(dataAnterior.getDate()).padStart(2, '0')

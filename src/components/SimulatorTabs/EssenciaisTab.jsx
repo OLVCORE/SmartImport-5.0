@@ -127,6 +127,34 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
   const [showPTAXPanel, setShowPTAXPanel] = useState(false)
   const [ptaxData, setPtaxData] = useState({})
 
+  // Adicionar apenas os novos estados para modo manual
+  const [ptaxMode, setPtaxMode] = useState('auto')
+  const [ptaxManualValue, setPtaxManualValue] = useState('')
+
+  // Função para alternar modo PTAX
+  const togglePtaxMode = () => {
+    const newMode = ptaxMode === 'auto' ? 'manual' : 'auto'
+    setPtaxMode(newMode)
+    
+    if (newMode === 'manual') {
+      setPtaxManualValue(data.ptax || '')
+    } else {
+      buscarCotacao()
+    }
+  }
+
+  // Função para aplicar PTAX manual
+  const applyManualPtax = () => {
+    const valor = parseFloat(ptaxManualValue)
+    if (!isNaN(valor) && valor > 0) {
+      setPtax(valor)
+      setPtaxInfo({ dataCotacao: 'Manual', fonte: 'Usuário' })
+      onChange({ ...data, ptax: valor })
+    } else {
+      alert('Por favor, insira um valor válido para o PTAX')
+    }
+  }
+
   // NOVO: Resetar estados ao montar/desmontar
   useEffect(() => {
     resetProcessamento()
@@ -1169,6 +1197,73 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
                   </button>
                 </div>
               </div>
+              
+              {/* Adicionar antes do PTAXPanel existente */}
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {ptaxMode === 'auto' ? 'Busca automática do Banco Central' : 'Modo manual ativo'}
+                </span>
+                
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={togglePtaxMode}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                      ptaxMode === 'auto' 
+                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
+                        : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                    }`}
+                    title={ptaxMode === 'auto' ? 'Alternar para modo manual' : 'Alternar para modo automático'}
+                  >
+                    {ptaxMode === 'auto' ? ' Manual' : '🤖 Auto'}
+                  </button>
+                  
+                  {ptaxMode === 'auto' && (
+                    <button
+                      onClick={buscarCotacao}
+                      disabled={loadingPtax}
+                      className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-1"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${loadingPtax ? 'animate-spin' : ''}`} />
+                      <span>Atualizar</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* Adicionar campo manual quando em modo manual */}
+              {ptaxMode === 'manual' && (
+                <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-start mb-3">
+                    <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                        Modo Manual Ativo
+                      </h4>
+                      <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                        Insira o valor do PTAX manualmente para simulações futuras.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex space-x-3">
+                    <input
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      value={ptaxManualValue}
+                      onChange={e => setPtaxManualValue(e.target.value)}
+                      placeholder="Ex: 5.1500"
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-sm"
+                    />
+                    <button
+                      onClick={applyManualPtax}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                </div>
+              )}
               
               {/* Painel PTAX Compacto */}
               <div className="bg-white dark:bg-slate-800 rounded-lg border border-blue-200 dark:border-blue-700 p-3 max-h-48 overflow-y-auto">

@@ -1,4 +1,4 @@
-// PTAX API - Versão corrigida sem conflitos de variáveis
+// PTAX API - Versão final corrigida
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido' })

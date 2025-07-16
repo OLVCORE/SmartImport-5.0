@@ -150,15 +150,17 @@ const EssenciaisTab = ({ data, onChange, onNext }) => {
     }
   }
 
-  // Função para aplicar PTAX manual
+  // Função para aplicar PTAX manual - CORRIGIDA
   const applyManualPtax = () => {
-    const valor = parseFloat(ptaxManualValue)
+    const valor = parseFloat(ptaxManualValue.replace(',', '.'))
     if (!isNaN(valor) && valor > 0) {
       setPtax(valor)
-      setPtaxInfo({ dataCotacao: 'Manual', fonte: 'Usuário' })
+      setPtaxInfo({ dataCotacao: ptaxDate, fonte: 'Manual' })
+      setPtaxMode('manual')
       onChange({ ...data, ptax: valor })
+      console.log('✅ PTAX manual aplicado:', valor)
     } else {
-      alert('Por favor, insira um valor válido para o PTAX')
+      alert('Por favor, insira um valor válido para o PTAX (ex: 5,50 ou 5.50)')
     }
   }
 
